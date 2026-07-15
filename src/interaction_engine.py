@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from math import hypot
 
 import config
+from gesture_engine import Gesture
 from pose_classifier import Pose
 
 
@@ -14,9 +15,15 @@ class SetCursor:
 
 
 @dataclass(frozen=True)
+class Click:
+    pass
+
+
+@dataclass(frozen=True)
 class EngineStatus:
     pointing: bool
     pose: Pose
+    pinched: bool
 
 
 class InteractionEngine:
@@ -29,17 +36,27 @@ class InteractionEngine:
 
         self._system_hold_start = None
         self._system_latched = False
+        self._last_click_t = None
 
         self._prev_tip = None
         self._prev_t = None
         # False while tip is missing/outside region so resume can re-anchor.
         self._tracking_active = False
 
-    def update(self, filtered_hand, pose, cursor_pos, t):
+    def update(self, filtered_hand, pose, gesture, pinched, cursor_pos, t):
         commands = []
 
-        self._handle_system_pose(pose, filtered_hand, cursor_pos, t)
+        self._handle_system_pose(pose, filtered_hand, t)
 
+        if (
+            self.pointing
+            and gesture == Gesture.PINCH_DOWN
+            and self._click_allowed(t)
+        ):
+            commands.append(Click())
+            self._last_click_t = t
+
+        # Pointer hand is independent of click-hand pinch; never freeze for click.
         can_move = (
             self.pointing
             and filtered_hand.tip is not None
@@ -70,8 +87,17 @@ class InteractionEngine:
             self._prev_tip = None
             self._prev_t = None
 
-        status = EngineStatus(pointing=self.pointing, pose=pose)
+        status = EngineStatus(
+            pointing=self.pointing,
+            pose=pose,
+            pinched=pinched,
+        )
         return status, commands
+
+    def _click_allowed(self, t):
+        if self._last_click_t is None:
+            return True
+        return t - self._last_click_t >= config.CLICK_DEBOUNCE
 
     def _gain_for_speed(self, speed):
         """Low speed → precise; high speed → faster travel."""
@@ -80,13 +106,12 @@ class InteractionEngine:
             return config.CURSOR_GAIN_MIN
 
         normalized = min(1.0, speed / ref)
-        # Smoothstep ease-in so fine motion stays in the low-gain band longer.
         blend = normalized * normalized * (3.0 - 2.0 * normalized)
         return config.CURSOR_GAIN_MIN + (
             config.CURSOR_GAIN_MAX - config.CURSOR_GAIN_MIN
         ) * blend
 
-    def _handle_system_pose(self, pose, filtered_hand, cursor_pos, t):
+    def _handle_system_pose(self, pose, filtered_hand, t):
         if pose != Pose.SYSTEM:
             self._system_hold_start = None
             self._system_latched = False

@@ -10,9 +10,38 @@ CAMERA_INDEX = 0
 CAMERA_WIDTH = 1280
 CAMERA_HEIGHT = 720
 
+# Run MediaPipe on a downscaled frame (landmarks are normalized, so tip
+# coords stay valid). Biggest CPU win after capture itself.
+INFERENCE_WIDTH = 640
+INFERENCE_HEIGHT = 360
+
+# Debug HUD
+SHOW_LANDMARKS = False  # full 21-point skeletons are expensive; tip marker stays on
+
+# How often to emit CG mouse-moved events while warping (Zoom/Electron hover).
+# 0 = every move frame (costly); 30 ≈ every 33ms.
+MOUSE_MOVE_EVENT_HZ = 30
+
 # Pose / interaction
 
 ACTIVATION_DELAY = 0.3  # seconds to hold SYSTEM (peace) before toggle
+
+# Two-hand roles from the user's perspective ("Left" / "Right").
+# Right hand points; left hand pinches to click.
+# Labels are corrected for the mirrored webcam preview.
+
+POINTER_HANDEDNESS = "Right"
+CLICK_HANDEDNESS = "Left"
+# Camera frames are mirrored; MediaPipe handedness is swapped to match the user.
+SWAP_HANDEDNESS_FOR_MIRROR = True
+
+NUM_HANDS = 2
+
+# Pinch / click on the click hand only (thumb tip ↔ index tip / hand scale)
+
+PINCH_ENTER = 0.35
+PINCH_EXIT = 0.45
+CLICK_DEBOUNCE = 0.35  # seconds between clicks
 
 # Cursor gain (screen pixels per normalized hand delta).
 # Slow motion uses MIN for icon aiming; fast motion ramps toward MAX.

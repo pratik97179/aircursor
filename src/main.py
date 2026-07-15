@@ -6,10 +6,12 @@ import cv2
 
 from action_dispatcher import ActionDispatcher
 from camera import Camera
+from gesture_engine import GestureEngine
 from hand_tracker import HandTracker
-from interaction_engine import InteractionEngine, SetCursor
+from interaction_engine import Click, InteractionEngine, SetCursor
 from landmark_filter import LandmarkFilter
 from pose_classifier import PoseClassifier
+import config
 
 
 def main():
@@ -17,13 +19,19 @@ def main():
     tracker = HandTracker()
     landmark_filter = LandmarkFilter()
     pose_classifier = PoseClassifier()
+    gesture_engine = GestureEngine()
     dispatcher = ActionDispatcher()
     screen_width, screen_height = dispatcher.screen_size()
     engine = InteractionEngine(screen_width, screen_height)
 
-    print("AirCursor v0.6")
-    print("Hold a peace sign to toggle Cursor Mode. Press 'q' to quit.")
-    print("Grant Accessibility permission if the cursor does not move.")
+    print("AirCursor v0.7")
+    print(
+        "Right hand = pointer (peace toggles Cursor Mode; index tip moves cursor)."
+    )
+    print(
+        "Left hand = click (pinch thumb + index to left-click)."
+    )
+    print("Press 'q' to quit. Grant Accessibility if cursor/click fail.")
 
     start = time.monotonic()
 
@@ -35,16 +43,15 @@ def main():
         timestamp_ms = int((time.monotonic() - start) * 1000)
         result = tracker.detect(frame, timestamp_ms)
 
-        landmarks = None
-        tip = None
+        pointer_hand, click_hand = tracker.resolve_hands(result)
+        tip = tracker.get_control_point(pointer_hand)
 
-        if result.hand_landmarks:
-            landmarks = result.hand_landmarks
-            tip = tracker.get_control_point(result)
+        if config.SHOW_LANDMARKS and result.hand_landmarks:
             frame = tracker.draw_landmarks(frame, result)
 
+        if tip is not None:
+            height, width = frame.shape[:2]
             tip_x, tip_y = tip
-            height, width, _ = frame.shape
             cv2.circle(
                 frame,
                 (int(tip_x * width), int(tip_y * height)),
@@ -54,15 +61,21 @@ def main():
             )
 
         now = time.monotonic()
-        filtered = landmark_filter.update(landmarks, tip, now)
-        pose = pose_classifier.classify(
-            filtered.landmarks if filtered.landmarks is not None else None
-        )
+        filtered = landmark_filter.update(pointer_hand, tip, now)
+        pose = pose_classifier.classify(filtered.hand)
+        gesture = gesture_engine.detect(click_hand)
 
-        cursor_pos = dispatcher.cursor_position()
+        # While not actively pointing, resync from OS (user may move mouse).
+        if engine.pointing:
+            cursor_pos = dispatcher.cursor_position()
+        else:
+            cursor_pos = dispatcher.sync_from_os()
+
         status, commands = engine.update(
             filtered,
             pose,
+            gesture,
+            gesture_engine.is_pinched,
             cursor_pos,
             now,
         )
@@ -70,8 +83,13 @@ def main():
         for command in commands:
             if isinstance(command, SetCursor):
                 dispatcher.set_cursor(command.x, command.y)
+            elif isinstance(command, Click):
+                dispatcher.click()
 
-        if status.pointing:
+        if status.pointing and status.pinched:
+            label = "CLICK"
+            color = (255, 200, 0)
+        elif status.pointing:
             label = "CURSOR MODE"
             color = (0, 255, 0)
         else:

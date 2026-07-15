@@ -2,16 +2,17 @@
 
 Hands-free macOS cursor control using a laptop webcam and MediaPipe hand tracking.
 
-AirCursor is built in public. v0.6 is the first architecture-aligned release: pose classification, interaction state, and OS cursor I/O are separated cleanly.
+AirCursor is built in public. v0.7 uses two hands: one points, the other pinches to click.
 
 ## What works today
 
-1. Detect a hand from the built-in webcam.
-2. Track the index fingertip (smoothed, active-region gated).
-3. Hold a **peace sign** (~0.3s) to toggle **Cursor Mode**.
-4. Move the macOS cursor with relative fingertip motion.
+1. Detect up to two hands from the built-in webcam.
+2. **Pointer hand** (default: Right) — track the index fingertip and move the cursor.
+3. Hold a **peace sign** on the pointer hand (~0.3s) to toggle **Cursor Mode**.
+4. **Click hand** (default: Left) — **pinch** thumb + index to **left-click** without moving the pointer finger.
+5. Swap roles in `src/config.py` (`POINTER_HANDEDNESS` / `CLICK_HANDEDNESS`) if needed.
 
-Clicks, scrolling, and drag are not implemented yet.
+Scrolling and drag are not implemented yet.
 
 ## Requirements
 
@@ -19,7 +20,7 @@ Clicks, scrolling, and drag are not implemented yet.
 - Python 3.14+
 - [uv](https://github.com/astral-sh/uv)
 - **Accessibility** permission for the terminal/IDE that runs AirCursor  
-  (System Settings → Privacy & Security → Accessibility), otherwise the cursor will not move.
+  (System Settings → Privacy & Security → Accessibility), otherwise cursor move and click will fail.
 
 ## Run
 
@@ -43,7 +44,7 @@ Press `q` in the preview window to quit.
 - **Python** + **uv**
 - **OpenCV** — webcam capture and HUD
 - **MediaPipe Hand Landmarker** — VIDEO mode, CPU, single hand
-- **PyObjC Quartz / AppKit** — cursor position and warp
+- **PyObjC Quartz / AppKit** — cursor warp and mouse clicks
 
 ## Project layout
 
@@ -53,6 +54,7 @@ src/
   hand_tracker.py
   landmark_filter.py
   pose_classifier.py
+  gesture_engine.py
   interaction_engine.py
   action_dispatcher.py
   config.py

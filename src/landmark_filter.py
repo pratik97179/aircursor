@@ -10,7 +10,7 @@ import config
 class FilteredHand:
     tip: tuple[float, float] | None
     tip_valid: bool
-    landmarks: object | None
+    hand: object | None
 
 
 def _smoothing_factor(cutoff, dt):
@@ -68,8 +68,8 @@ class LandmarkFilter:
         self._miss_frames = 0
         self._last_tip = None
 
-    def update(self, landmarks, tip, t):
-        if landmarks is None or tip is None:
+    def update(self, hand, tip, t):
+        if hand is None or tip is None:
             self._miss_frames += 1
             if (
                 self._miss_frames <= config.TIP_LOSS_GRACE_FRAMES
@@ -78,11 +78,11 @@ class LandmarkFilter:
                 return FilteredHand(
                     tip=self._last_tip,
                     tip_valid=False,
-                    landmarks=None,
+                    hand=None,
                 )
 
             self.reset()
-            return FilteredHand(tip=None, tip_valid=False, landmarks=None)
+            return FilteredHand(tip=None, tip_valid=False, hand=None)
 
         self._miss_frames = 0
         tip_x, tip_y = tip
@@ -104,5 +104,5 @@ class LandmarkFilter:
         return FilteredHand(
             tip=smoothed,
             tip_valid=tip_valid,
-            landmarks=landmarks,
+            hand=hand,
         )

@@ -2,26 +2,47 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.7.0]
+
+### Added
+
+- Two-hand input: right hand points; left hand pinches to left-click.
+- Configurable `POINTER_HANDEDNESS` / `CLICK_HANDEDNESS` with mirror-corrected labels.
+- GestureEngine with hysteretic `PINCH_DOWN` / `PINCH_UP` on the click hand only.
+- Left-click while Cursor Mode is on (InteractionEngine `Click` + ActionDispatcher Quartz events).
+- Click debounce; pointer tip stays independent of the click pinch.
+- HUD shows `CLICK` while the click hand is pinched in Cursor Mode.
+
+### Changed
+
+- HandTracker tracks up to two hands, resolves roles in one pass, and can run inference at 640×360.
+- PoseClassifier no longer treats pinch as a pointer pose.
+- ActionDispatcher caches cursor position, throttles mouse-move events, and dual-taps clicks for Zoom/Electron.
+- Camera uses a single-frame buffer; debug skeletons are off by default (`SHOW_LANDMARKS`).
+- Architecture docs and README updated for two-hand click and performance tunables.
+- Package version set to 0.7.0.
+
 ## [0.6.0]
 
 ### Added
 
 - Introduced architecture layers: Camera, LandmarkFilter, PoseClassifier, InteractionEngine, ActionDispatcher.
 - PoseClassifier with `NONE`, `POINT`, and `SYSTEM` (peace) families.
-- InteractionEngine owns pointing mode, SYSTEM hold timing, and relative cursor math.
-- LandmarkFilter tip EMA, dead zone, and active-region gating.
+- InteractionEngine owns pointing mode, SYSTEM hold timing, and cursor motion.
+- LandmarkFilter One Euro tip smoothing, active-region gating, and tip-loss grace.
+- Speed-based cursor gain and resume re-anchoring.
 - ActionDispatcher Quartz cursor get/set with screen clamping.
 - Project entrypoint (`uv run aircursor`) and config-backed tunables.
 
 ### Changed
 
-- HandTracker uses MediaPipe VIDEO mode with CPU delegate and a project-root model path.
+- HandTracker uses MediaPipe VIDEO mode with CPU delegate and a resolved model path.
 - Camera capture uses AVFoundation at 1280×720 when available.
 - Docs and package metadata aligned with the running pipeline.
 
 ### Removed
 
-- GestureEngine and CursorController (responsibilities split into PoseClassifier, InteractionEngine, and ActionDispatcher).
+- Earlier GestureEngine / CursorController MVP modules (replaced by PoseClassifier, InteractionEngine, and ActionDispatcher; GestureEngine returns in 0.7 for pinch edges).
 
 ## [0.5.0]
 

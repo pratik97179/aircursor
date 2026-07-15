@@ -20,6 +20,8 @@ class Camera:
         self._capture = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
         self._capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self._capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        # Prefer the newest frame; avoid building up capture lag on M-series.
+        self._capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     def read(self):
         success, frame = self._capture.read()

@@ -7,6 +7,8 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
+import config
+
 
 def _default_model_path():
     """Resolve hand_landmarker.task for src/ runs and installed entrypoints."""
@@ -45,13 +47,26 @@ class HandTracker:
         options = vision.HandLandmarkerOptions(
             base_options=base_options,
             running_mode=vision.RunningMode.VIDEO,
-            num_hands=1,
+            num_hands=config.NUM_HANDS,
         )
 
         self.detector = vision.HandLandmarker.create_from_options(options)
+        self._infer_w = config.INFERENCE_WIDTH
+        self._infer_h = config.INFERENCE_HEIGHT
 
     def detect(self, frame, timestamp_ms):
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # Downscale for inference; landmarks are normalized to the image used.
+        height, width = frame.shape[:2]
+        if width != self._infer_w or height != self._infer_h:
+            small = cv2.resize(
+                frame,
+                (self._infer_w, self._infer_h),
+                interpolation=cv2.INTER_AREA,
+            )
+        else:
+            small = frame
+
+        rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
         return self.detector.detect_for_video(image, timestamp_ms)
 
@@ -66,9 +81,47 @@ class HandTracker:
 
         return frame
 
-    def get_control_point(self, detection_result):
-        if not detection_result.hand_landmarks:
+    def handedness_label(self, detection_result, index):
+        if not detection_result.handedness:
+            return None
+        if index >= len(detection_result.handedness):
+            return None
+        categories = detection_result.handedness[index]
+        if not categories:
             return None
 
-        hand = detection_result.hand_landmarks[0]
+        label = categories[0].category_name
+        if config.SWAP_HANDEDNESS_FOR_MIRROR:
+            if label == "Left":
+                return "Right"
+            if label == "Right":
+                return "Left"
+        return label
+
+    def resolve_hands(self, detection_result):
+        """Single pass: return (pointer_hand, click_hand)."""
+        pointer = None
+        click = None
+
+        if not detection_result.hand_landmarks:
+            return pointer, click
+
+        pointer_target = config.POINTER_HANDEDNESS.lower()
+        click_target = config.CLICK_HANDEDNESS.lower()
+
+        for index, hand in enumerate(detection_result.hand_landmarks):
+            label = self.handedness_label(detection_result, index)
+            if not label:
+                continue
+            key = label.lower()
+            if pointer is None and key == pointer_target:
+                pointer = hand
+            elif click is None and key == click_target:
+                click = hand
+
+        return pointer, click
+
+    def get_control_point(self, hand):
+        if hand is None:
+            return None
         return hand[8].x, hand[8].y

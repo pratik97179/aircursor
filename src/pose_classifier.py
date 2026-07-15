@@ -1,4 +1,4 @@
-"""Stateless pose family classification from hand landmarks."""
+"""Stateless pose family classification from a single hand's landmarks."""
 
 from enum import Enum
 
@@ -11,17 +11,17 @@ class Pose(Enum):
 
 class PoseClassifier:
     """
-    Release taxonomy:
-    - NONE: no hand
-    - SYSTEM: peace (index + middle up, ring + pinky down)
-    - POINT: hand present, not SYSTEM
+    Pointer-hand taxonomy:
+    - NONE: no pointer hand
+    - SYSTEM: peace (index + middle up, ring + pinky down) — mode toggle
+    - POINT: pointer hand present, otherwise
+
+    Click is not a pointer pose; the other hand pinches via GestureEngine.
     """
 
-    def classify(self, landmarks):
-        if not landmarks:
+    def classify(self, hand):
+        if hand is None:
             return Pose.NONE
-
-        hand = landmarks[0]
 
         index_up = hand[8].y < hand[6].y
         middle_up = hand[12].y < hand[10].y
