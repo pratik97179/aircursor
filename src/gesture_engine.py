@@ -13,8 +13,8 @@ class GestureEngine:
         self.gesture_held = False
         self.activation_start_time = None
 
-        # Hold gesture for 400 ms before toggling.
-        self.activation_delay = 0.4
+        # Hold gesture for 300 ms before toggling.
+        self.activation_delay = 0.3
 
     def detect(self, hand_landmarks):
 
