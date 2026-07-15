@@ -1,29 +1,68 @@
 # AirCursor
 
-AirCursor is a computer vision project that enables hands-free cursor control on macOS using a standard webcam. It tracks hand movements in real time and translates them into mouse interactions, exploring a natural and intuitive way of interacting with a computer.
+Hands-free macOS cursor control using a laptop webcam and MediaPipe hand tracking.
 
-This project is being built publicly from day one, with every milestone committed and pushed to GitHub. The primary goal is not only to create a functional application but also to document the engineering process behind building a real-time computer vision system from scratch.
+AirCursor is built in public. v0.6 is the first architecture-aligned release: pose classification, interaction state, and OS cursor I/O are separated cleanly.
 
-## About the Project
+## What works today
 
-The initial MVP focuses on four core capabilities:
+1. Detect a hand from the built-in webcam.
+2. Track the index fingertip (smoothed, active-region gated).
+3. Hold a **peace sign** (~0.3s) to toggle **Cursor Mode**.
+4. Move the macOS cursor with relative fingertip motion.
 
-* Detect a hand from the webcam feed.
-* Track the user's index fingertip.
-* Activate a dedicated "Cursor Mode" using a hand gesture.
-* Control the macOS cursor using the tracked fingertip.
+Clicks, scrolling, and drag are not implemented yet.
 
-Once the MVP is complete, the project will be extended with features such as gesture-based clicks, scrolling, drag-and-drop, custom gesture mapping, and AI-powered gesture recognition.
+## Requirements
 
-## Tech Stack
+- macOS (tested target: Apple Silicon, built-in FaceTime camera)
+- Python 3.14+
+- [uv](https://github.com/astral-sh/uv)
+- **Accessibility** permission for the terminal/IDE that runs AirCursor  
+  (System Settings → Privacy & Security → Accessibility), otherwise the cursor will not move.
 
-AirCursor is currently being developed with:
+## Run
 
-* **Python** — Primary programming language
-* **OpenCV** — Webcam access and image processing
-* **MediaPipe** — Real-time hand detection and landmark tracking
-* **NumPy** — Mathematical operations and coordinate calculations
-* **PyAutoGUI / Quartz** — Cursor control on macOS
-* **uv** — Python package and environment management
+From the repository root:
 
-> **Note:** This README is intentionally minimal and will evolve alongside the project as new features, documentation, demos, and architectural decisions are added.
+```bash
+uv sync
+uv run aircursor
+```
+
+Or:
+
+```bash
+uv run python src/main.py
+```
+
+Press `q` in the preview window to quit.
+
+## Tech stack
+
+- **Python** + **uv**
+- **OpenCV** — webcam capture and HUD
+- **MediaPipe Hand Landmarker** — VIDEO mode, CPU, single hand
+- **PyObjC Quartz / AppKit** — cursor position and warp
+
+## Project layout
+
+```text
+src/
+  camera.py
+  hand_tracker.py
+  landmark_filter.py
+  pose_classifier.py
+  interaction_engine.py
+  action_dispatcher.py
+  config.py
+  main.py
+models/hand_landmarker.task
+docs/architecture.md
+```
+
+See [docs/architecture.md](docs/architecture.md) for the pipeline and module responsibilities.
+
+## License
+
+Personal / public learning project unless otherwise noted.

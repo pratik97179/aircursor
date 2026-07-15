@@ -1,7 +1,7 @@
 [project]
 name = "aircursor"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.6.0"
+description = "Hands-free macOS cursor control via webcam hand tracking"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -10,3 +10,23 @@ dependencies = [
     "opencv-python>=5.0.0.93",
     "pyobjc-framework-quartz>=12.2.1",
 ]
+
+[project.scripts]
+aircursor = "main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/main.py" = "main.py"
+"src/config.py" = "config.py"
+"src/camera.py" = "camera.py"
+"src/hand_tracker.py" = "hand_tracker.py"
+"src/landmark_filter.py" = "landmark_filter.py"
+"src/pose_classifier.py" = "pose_classifier.py"
+"src/interaction_engine.py" = "interaction_engine.py"
+"src/action_dispatcher.py" = "action_dispatcher.py"

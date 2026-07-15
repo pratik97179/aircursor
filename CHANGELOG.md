@@ -2,14 +2,35 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.6.0]
+
+### Added
+
+- Introduced architecture layers: Camera, LandmarkFilter, PoseClassifier, InteractionEngine, ActionDispatcher.
+- PoseClassifier with `NONE`, `POINT`, and `SYSTEM` (peace) families.
+- InteractionEngine owns pointing mode, SYSTEM hold timing, and relative cursor math.
+- LandmarkFilter tip EMA, dead zone, and active-region gating.
+- ActionDispatcher Quartz cursor get/set with screen clamping.
+- Project entrypoint (`uv run aircursor`) and config-backed tunables.
+
+### Changed
+
+- HandTracker uses MediaPipe VIDEO mode with CPU delegate and a project-root model path.
+- Camera capture uses AVFoundation at 1280×720 when available.
+- Docs and package metadata aligned with the running pipeline.
+
+### Removed
+
+- GestureEngine and CursorController (responsibilities split into PoseClassifier, InteractionEngine, and ActionDispatcher).
+
 ## [0.5.0]
 
 ### Added
 
-- Added gesture-based cursor activation using.
-- Added relative cursor movement to eliminate cursor teleportation.
+- Gesture-based cursor activation using a peace-sign hold.
+- Relative cursor movement to eliminate cursor teleportation.
 - Switched cursor control back to the index fingertip.
-- Added gesture activation timing using a monotonic clock.
+- Gesture activation timing using a monotonic clock.
 
 ### Changed
 
