@@ -12,3 +12,11 @@ All notable changes to AirCursor are documented in this file.
 - Implemented the initial OpenCV webcam pipeline.
 - Displayed the live webcam feed.
 - Configured Git and GitHub for version control.
+
+## [0.2.0]
+
+### Added
+
+- Integrated MediaPipe Tasks API.
+- Added real-time hand detection.
+- Rendered 21 hand landmarks on the webcam feed.
