@@ -1,4 +1,4 @@
-# AirCursor Architecture (v0.8)
+# AirCursor Architecture (v0.9.1)
 
 ## Pipeline (implemented)
 
@@ -22,7 +22,7 @@ Camera
 | Role | Default | Responsibility |
 |------|---------|----------------|
 | Pointer | `Right` | Peace toggle, index-tip cursor move |
-| Click / Navigate | `Left` | Pinch → click; hold pinch + pointer move → drag; two-finger swipe → scroll |
+| Click / Navigate | `Left` | Quick pinch → click; hold/move → drag; two-finger swipe → scroll |
 
 `SWAP_HANDEDNESS_FOR_MIRROR` keeps labels matched to the mirrored preview.
 
@@ -51,8 +51,8 @@ Camera
 
 ### InteractionEngine
 - Pointing mode + SYSTEM hold
-- Commands: `SetCursor`, `MouseDown`, `MouseUp`, `Scroll`
-- Pinch hold + pointer move = drag; brief pinch = click
+- Commands: `SetCursor`, `Click`, `MouseDown`, `MouseUp`, `Scroll`
+- Pending pinch: quick release → `Click`; hold/move → drag
 
 ### ActionDispatcher
 - Cursor warp + throttled mouse-move events

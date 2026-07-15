@@ -40,8 +40,13 @@ NUM_HANDS = 2
 # Pinch / click on the click hand only (thumb tip ↔ index tip / hand scale)
 
 PINCH_ENTER = 0.35
-PINCH_EXIT = 0.45
-CLICK_DEBOUNCE = 0.35  # seconds between clicks
+PINCH_EXIT = 0.42  # closer to enter so brief pinches release cleanly
+CLICK_DEBOUNCE = 0.25  # seconds between click/drag arms
+
+# Click vs drag (pinch is pending until one of these fires)
+# Release before promote → single click. Move or hold → mouse-down (drag).
+DRAG_SLOP = 0.014  # normalized pointer travel to promote to drag
+DRAG_ARM_HOLD = 0.35  # seconds held still before arming drag
 
 # Two-finger scroll on the click hand (index + middle up, like a trackpad).
 # Positive hand motion up (decreasing y) → natural content scroll up.

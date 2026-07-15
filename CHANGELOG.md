@@ -2,6 +2,14 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.9.1]
+
+### Fixed
+
+- Quick pinch no longer holds the mouse button; short pinch is an atomic click.
+- Drag only arms after pointer travel (`DRAG_SLOP`) or a short hold (`DRAG_ARM_HOLD`).
+- Easier pinch release (`PINCH_EXIT` closer to enter).
+
 ## [0.9.0]
 
 ### Added

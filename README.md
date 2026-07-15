@@ -2,7 +2,7 @@
 
 Hands-free macOS cursor control using a laptop webcam and MediaPipe hand tracking.
 
-AirCursor is built in public. v0.9 adds pinch-hold drag.
+AirCursor is built in public. v0.9.1: move, click, scroll, drag — with quick-pinch click fixed.
 
 ## What works today
 

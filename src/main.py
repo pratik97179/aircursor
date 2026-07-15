@@ -10,6 +10,7 @@ from camera import Camera
 from gesture_engine import GestureEngine
 from hand_tracker import HandTracker
 from interaction_engine import (
+    Click,
     InteractionEngine,
     MouseDown,
     MouseUp,
@@ -30,12 +31,12 @@ def main():
     screen_width, screen_height = dispatcher.screen_size()
     engine = InteractionEngine(screen_width, screen_height)
 
-    print("AirCursor v0.9")
+    print("AirCursor v0.9.1")
     print(
         "Right hand = pointer (peace toggles Cursor Mode; index tip moves cursor)."
     )
     print(
-        "Left hand = pinch hold to click/drag; two-finger swipe to scroll."
+        "Left hand = quick pinch to click; hold/move to drag; two-finger swipe to scroll."
     )
     print("Press 'q' to quit. Grant Accessibility if input fails.")
 
@@ -87,6 +88,8 @@ def main():
         for command in commands:
             if isinstance(command, SetCursor):
                 dispatcher.set_cursor(command.x, command.y)
+            elif isinstance(command, Click):
+                dispatcher.click()
             elif isinstance(command, MouseDown):
                 dispatcher.mouse_down()
             elif isinstance(command, MouseUp):

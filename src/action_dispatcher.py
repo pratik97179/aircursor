@@ -76,6 +76,21 @@ class ActionDispatcher:
             )
             self._last_move_event_t = now
 
+    def click(self):
+        """Atomic left click for short pinches (never leaves the button held)."""
+        import time
+
+        x, y = self._x, self._y
+        self._post_mouse(kCGEventMouseMoved, x, y, dual_tap=True)
+        self._post_mouse(
+            kCGEventLeftMouseDown, x, y, click_state=1, dual_tap=True
+        )
+        time.sleep(0.02)
+        self._post_mouse(
+            kCGEventLeftMouseUp, x, y, click_state=1, dual_tap=True
+        )
+        self._button_down = False
+
     def mouse_down(self):
         x, y = self._x, self._y
         self._post_mouse(kCGEventMouseMoved, x, y, dual_tap=True)

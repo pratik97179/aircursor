@@ -15,6 +15,12 @@ class SetCursor:
 
 
 @dataclass(frozen=True)
+class Click:
+    """Atomic left click (down + up). Used for short pinches."""
+    pass
+
+
+@dataclass(frozen=True)
 class MouseDown:
     pass
 
@@ -49,7 +55,12 @@ class InteractionEngine:
 
         self._system_hold_start = None
         self._system_latched = False
-        self._last_mouse_down_t = None
+        self._last_press_t = None
+
+        # Pinch resolution: pending → Click on quick release, or MouseDown for drag.
+        self._pinch_pending = False
+        self._pinch_start_t = None
+        self._pinch_start_tip = None
         self._primary_down = False
 
         self._prev_tip = None
@@ -62,22 +73,12 @@ class InteractionEngine:
         commands = []
 
         self._handle_system_pose(pose, filtered_hand, t, commands)
-
-        # Pinch hold = button down (click if brief, drag if move while held).
-        if self.pointing and click_signal.gesture == Gesture.PINCH_DOWN:
-            if not self._primary_down and self._mouse_down_allowed(t):
-                commands.append(MouseDown())
-                self._primary_down = True
-                self._last_mouse_down_t = t
-                self._prev_scroll_point = None
-
-        if click_signal.gesture == Gesture.PINCH_UP and self._primary_down:
-            commands.append(MouseUp())
-            self._primary_down = False
+        self._handle_pinch(filtered_hand, click_signal, t, commands)
 
         if (
             self.pointing
             and not self._primary_down
+            and not self._pinch_pending
             and click_signal.scrolling
             and click_signal.scroll_point
         ):
@@ -129,11 +130,54 @@ class InteractionEngine:
             scrolling=bool(
                 self.pointing
                 and not self._primary_down
+                and not self._pinch_pending
                 and click_signal.scrolling
             ),
             dragging=bool(self.pointing and self._primary_down),
         )
         return status, commands
+
+    def _handle_pinch(self, filtered_hand, click_signal, t, commands):
+        tip = filtered_hand.tip
+
+        if self.pointing and click_signal.gesture == Gesture.PINCH_DOWN:
+            if (
+                not self._pinch_pending
+                and not self._primary_down
+                and self._press_allowed(t)
+            ):
+                self._pinch_pending = True
+                self._pinch_start_t = t
+                self._pinch_start_tip = tip
+                self._prev_scroll_point = None
+
+        if self._pinch_pending and click_signal.pinched:
+            moved = self._pinch_tip_travel(tip)
+            held = t - (self._pinch_start_t or t)
+            if moved >= config.DRAG_SLOP or held >= config.DRAG_ARM_HOLD:
+                commands.append(MouseDown())
+                self._primary_down = True
+                self._pinch_pending = False
+                self._last_press_t = t
+
+        if click_signal.gesture == Gesture.PINCH_UP:
+            if self._pinch_pending:
+                commands.append(Click())
+                self._pinch_pending = False
+                self._pinch_start_t = None
+                self._pinch_start_tip = None
+                self._last_press_t = t
+            elif self._primary_down:
+                commands.append(MouseUp())
+                self._primary_down = False
+
+    def _pinch_tip_travel(self, tip):
+        if tip is None or self._pinch_start_tip is None:
+            return 0.0
+        return hypot(
+            tip[0] - self._pinch_start_tip[0],
+            tip[1] - self._pinch_start_tip[1],
+        )
 
     def _scroll_from_delta(self, dx, dy):
         sx = dx * config.SCROLL_GAIN_X
@@ -150,10 +194,10 @@ class InteractionEngine:
 
         return Scroll(dx=sx, dy=sy)
 
-    def _mouse_down_allowed(self, t):
-        if self._last_mouse_down_t is None:
+    def _press_allowed(self, t):
+        if self._last_press_t is None:
             return True
-        return t - self._last_mouse_down_t >= config.CLICK_DEBOUNCE
+        return t - self._last_press_t >= config.CLICK_DEBOUNCE
 
     def _gain_for_speed(self, speed):
         ref = config.CURSOR_GAIN_SPEED_REF
@@ -186,6 +230,9 @@ class InteractionEngine:
             if self._primary_down:
                 commands.append(MouseUp())
                 self._primary_down = False
+            self._pinch_pending = False
+            self._pinch_start_t = None
+            self._pinch_start_tip = None
             self.pointing = False
             self._tracking_active = False
             self._prev_tip = None
