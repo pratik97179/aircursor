@@ -19,9 +19,12 @@ from Quartz.CoreGraphics import (
     kCGEventLeftMouseDragged,
     kCGEventLeftMouseUp,
     kCGEventMouseMoved,
+    kCGEventRightMouseDown,
+    kCGEventRightMouseUp,
     kCGEventSourceStateHIDSystemState,
     kCGHIDEventTap,
     kCGMouseButtonLeft,
+    kCGMouseButtonRight,
     kCGMouseEventClickState,
     kCGScrollEventUnitPixel,
     kCGSessionEventTap,
@@ -99,6 +102,30 @@ class ActionDispatcher:
             kCGEventLeftMouseUp, x, y, click_state=1, dual_tap=True
         )
         self._button_down = False
+
+    def right_click(self):
+        """Atomic right click for thumb + middle pinches."""
+        import time
+
+        x, y = self._x, self._y
+        self._post_mouse(kCGEventMouseMoved, x, y, dual_tap=True)
+        self._post_mouse(
+            kCGEventRightMouseDown,
+            x,
+            y,
+            click_state=1,
+            dual_tap=True,
+            button=kCGMouseButtonRight,
+        )
+        time.sleep(0.02)
+        self._post_mouse(
+            kCGEventRightMouseUp,
+            x,
+            y,
+            click_state=1,
+            dual_tap=True,
+            button=kCGMouseButtonRight,
+        )
 
     def mouse_down(self):
         x, y = self._x, self._y
@@ -179,12 +206,20 @@ class ActionDispatcher:
         location = CGEventGetLocation(event)
         return float(location.x), float(location.y)
 
-    def _post_mouse(self, event_type, x, y, click_state=None, dual_tap=False):
+    def _post_mouse(
+        self,
+        event_type,
+        x,
+        y,
+        click_state=None,
+        dual_tap=False,
+        button=kCGMouseButtonLeft,
+    ):
         event = CGEventCreateMouseEvent(
             self._source,
             event_type,
             (x, y),
-            kCGMouseButtonLeft,
+            button,
         )
         if click_state is not None:
             CGEventSetIntegerValueField(

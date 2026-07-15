@@ -1,4 +1,4 @@
-"""Click-hand pinch, two-finger scroll, and five-finger space swipe."""
+"""Click-hand pinch, right-click, two-finger scroll, and five-finger space swipe."""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -11,12 +11,15 @@ class Gesture(Enum):
     NONE = "none"
     PINCH_DOWN = "pinch_down"
     PINCH_UP = "pinch_up"
+    RIGHT_PINCH_DOWN = "right_pinch_down"
+    RIGHT_PINCH_UP = "right_pinch_up"
 
 
 @dataclass(frozen=True)
 class ClickHandSignal:
     gesture: Gesture
     pinched: bool
+    right_pinched: bool
     scrolling: bool
     scroll_point: tuple[float, float] | None
     open_palm: bool
@@ -35,6 +38,14 @@ def pinch_ratio(hand):
     thumb = hand[4]
     index = hand[8]
     distance = hypot(thumb.x - index.x, thumb.y - index.y)
+    return distance / _hand_scale(hand)
+
+
+def middle_pinch_ratio(hand):
+    """Thumb tip (4) to middle tip (12), divided by hand scale."""
+    thumb = hand[4]
+    middle = hand[12]
+    distance = hypot(thumb.x - middle.x, thumb.y - middle.y)
     return distance / _hand_scale(hand)
 
 
@@ -91,17 +102,20 @@ def palm_point(hand):
 class GestureEngine:
     """
     Click-hand signals:
-    - pinch edges for click/drag
+    - thumb+index pinch edges for left click/drag
+    - thumb+middle pinch edges for right click
     - two-finger pose for scroll
     - open palm for Spaces swipe
-    Priority: pinch > open palm > two-finger scroll.
+    Priority: index pinch > middle pinch > open palm > two-finger scroll.
     """
 
     def __init__(self):
         self._pinched = False
+        self._right_pinched = False
 
     def reset(self):
         self._pinched = False
+        self._right_pinched = False
 
     def observe(self, hand):
         if hand is None:
@@ -109,28 +123,47 @@ class GestureEngine:
             if self._pinched:
                 self._pinched = False
                 gesture = Gesture.PINCH_UP
+            elif self._right_pinched:
+                self._right_pinched = False
+                gesture = Gesture.RIGHT_PINCH_UP
             return ClickHandSignal(
                 gesture=gesture,
                 pinched=False,
+                right_pinched=False,
                 scrolling=False,
                 scroll_point=None,
                 open_palm=False,
                 palm_point=None,
             )
 
-        ratio = pinch_ratio(hand)
+        index_ratio = pinch_ratio(hand)
+        middle_ratio = middle_pinch_ratio(hand)
         gesture = Gesture.NONE
 
-        if not self._pinched and ratio <= config.PINCH_ENTER:
+        # Index pinch owns the slot while active (left click / drag).
+        if self._pinched:
+            if index_ratio >= config.PINCH_EXIT:
+                self._pinched = False
+                gesture = Gesture.PINCH_UP
+        elif self._right_pinched:
+            if middle_ratio >= config.PINCH_EXIT:
+                self._right_pinched = False
+                gesture = Gesture.RIGHT_PINCH_UP
+        elif index_ratio <= config.PINCH_ENTER and index_ratio <= middle_ratio:
+            # Prefer thumb+index when both are close.
             self._pinched = True
             gesture = Gesture.PINCH_DOWN
-        elif self._pinched and ratio >= config.PINCH_EXIT:
-            self._pinched = False
-            gesture = Gesture.PINCH_UP
+        elif (
+            middle_ratio <= config.PINCH_ENTER
+            and middle_ratio < index_ratio
+        ):
+            self._right_pinched = True
+            gesture = Gesture.RIGHT_PINCH_DOWN
 
-        open_palm = not self._pinched and is_open_palm(hand)
+        busy = self._pinched or self._right_pinched
+        open_palm = not busy and is_open_palm(hand)
         scrolling = (
-            not self._pinched
+            not busy
             and not open_palm
             and is_two_finger_pose(hand)
         )
@@ -138,6 +171,7 @@ class GestureEngine:
         return ClickHandSignal(
             gesture=gesture,
             pinched=self._pinched,
+            right_pinched=self._right_pinched,
             scrolling=scrolling,
             scroll_point=two_finger_point(hand) if scrolling else None,
             open_palm=open_palm,

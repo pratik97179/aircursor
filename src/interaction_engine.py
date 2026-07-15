@@ -21,6 +21,12 @@ class Click:
 
 
 @dataclass(frozen=True)
+class RightClick:
+    """Atomic right click (down + up). Thumb + middle pinch."""
+    pass
+
+
+@dataclass(frozen=True)
 class MouseDown:
     pass
 
@@ -51,6 +57,7 @@ class EngineStatus:
     dragging: bool
     switching_space: bool
     space_ready: bool
+    right_clicked: bool
 
 
 class InteractionEngine:
@@ -69,6 +76,8 @@ class InteractionEngine:
         self._pinch_start_t = None
         self._pinch_start_tip = None
         self._primary_down = False
+        self._right_pending = False
+        self._right_flash = False
 
         self._prev_tip = None
         self._prev_t = None
@@ -86,15 +95,18 @@ class InteractionEngine:
     def update(self, filtered_hand, pose, click_signal, cursor_pos, t):
         commands = []
         self._space_flash = False
+        self._right_flash = False
 
         self._handle_system_pose(pose, filtered_hand, t, commands)
         self._handle_pinch(filtered_hand, click_signal, t, commands)
+        self._handle_right_pinch(click_signal, t, commands)
         self._handle_space_swipe(click_signal, t, commands)
 
         if (
             self.pointing
             and not self._primary_down
             and not self._pinch_pending
+            and not self._right_pending
             and not self._space_ready
             and click_signal.scrolling
             and click_signal.scroll_point
@@ -149,12 +161,14 @@ class InteractionEngine:
                 self.pointing
                 and not self._primary_down
                 and not self._pinch_pending
+                and not self._right_pending
                 and not self._space_ready
                 and click_signal.scrolling
             ),
             dragging=bool(self.pointing and self._primary_down),
             switching_space=self._space_flash,
             space_ready=self._space_ready,
+            right_clicked=self._right_flash,
         )
         return status, commands
 
@@ -165,6 +179,7 @@ class InteractionEngine:
             and self.pointing
             and not self._primary_down
             and not self._pinch_pending
+            and not self._right_pending
         )
 
         if palm_now:
@@ -182,6 +197,7 @@ class InteractionEngine:
             and self.pointing
             and not self._primary_down
             and not self._pinch_pending
+            and not self._right_pending
         ):
             # Keep last palm / grace tracking only while landmarks still arrive.
             palm = click_signal.palm_point
@@ -221,6 +237,7 @@ class InteractionEngine:
             if (
                 not self._pinch_pending
                 and not self._primary_down
+                and not self._right_pending
                 and self._press_allowed(t)
             ):
                 self._pinch_pending = True
@@ -247,6 +264,24 @@ class InteractionEngine:
             elif self._primary_down:
                 commands.append(MouseUp())
                 self._primary_down = False
+
+    def _handle_right_pinch(self, click_signal, t, commands):
+        if self.pointing and click_signal.gesture == Gesture.RIGHT_PINCH_DOWN:
+            if (
+                not self._right_pending
+                and not self._pinch_pending
+                and not self._primary_down
+                and self._press_allowed(t)
+            ):
+                self._right_pending = True
+                self._prev_scroll_point = None
+
+        if click_signal.gesture == Gesture.RIGHT_PINCH_UP:
+            if self._right_pending:
+                commands.append(RightClick())
+                self._right_pending = False
+                self._right_flash = True
+                self._last_press_t = t
 
     def _pinch_tip_travel(self, tip):
         if tip is None or self._pinch_start_tip is None:
@@ -310,6 +345,7 @@ class InteractionEngine:
             self._pinch_pending = False
             self._pinch_start_t = None
             self._pinch_start_tip = None
+            self._right_pending = False
             self._space_origin = None
             self._space_armed = False
             self._space_ready = False

@@ -1,4 +1,4 @@
-# AirCursor Architecture (v0.10)
+# AirCursor Architecture (v0.11)
 
 ## Pipeline (implemented)
 
@@ -7,7 +7,7 @@ Camera
   → HandTracker (up to 2 hands)
   → LandmarkFilter (pointer hand tip)
   → PoseClassifier (pointer hand)
-  → GestureEngine (click hand: pinch + two-finger scroll)
+  → GestureEngine (click hand: pinches + scroll + palm)
   → InteractionEngine
   → ActionDispatcher
   → macOS
@@ -22,7 +22,7 @@ Camera
 | Role | Default | Responsibility |
 |------|---------|----------------|
 | Pointer | `Right` | Peace toggle, index-tip cursor move |
-| Click / Navigate | `Left` | Quick pinch → click; hold/move → drag; two-finger → scroll; open palm swipe → Spaces |
+| Click / Navigate | `Left` | Thumb+index click/drag; thumb+middle right-click; two-finger scroll; open palm → Spaces |
 
 
 `SWAP_HANDEDNESS_FOR_MIRROR` keeps labels matched to the mirrored preview.
@@ -46,20 +46,22 @@ Camera
 - Pointer hand: `NONE`, `POINT`, `SYSTEM` (peace)
 
 ### GestureEngine
-- Click hand pinch edges: `PINCH_DOWN` / `PINCH_UP`
+- Thumb+index pinch edges: `PINCH_DOWN` / `PINCH_UP`
+- Thumb+middle pinch edges: `RIGHT_PINCH_DOWN` / `RIGHT_PINCH_UP`
 - Two-finger pose → scroll point (index + middle tip midpoint)
 - Open palm → palm point for Spaces swipe
-- Pinch wins over open palm / scroll
+- Priority: index pinch > middle pinch > open palm > scroll
 
 ### InteractionEngine
 - Pointing mode + SYSTEM hold
-- Commands: `SetCursor`, `Click`, `MouseDown`, `MouseUp`, `Scroll`, `SwitchSpace`
-- Pending pinch: quick release → `Click`; hold/move → drag
+- Commands: `SetCursor`, `Click`, `RightClick`, `MouseDown`, `MouseUp`, `Scroll`, `SwitchSpace`
+- Pending index pinch: quick release → `Click`; hold/move → drag
+- Middle pinch release → `RightClick` (atomic)
 - Open-palm horizontal swipe → Space switch (palm grace mid-swipe; HUD `PALM — swipe`)
 
 ### ActionDispatcher
 - Cursor warp + throttled mouse-move events
-- Left click; pixel scroll wheel; Space switch via System Events / Ctrl+Arrow
+- Left/right click; pixel scroll wheel; Quartz Ctrl+Arrow Space switching
 
 ---
 

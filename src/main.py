@@ -14,6 +14,7 @@ from interaction_engine import (
     InteractionEngine,
     MouseDown,
     MouseUp,
+    RightClick,
     Scroll,
     SetCursor,
     SwitchSpace,
@@ -32,13 +33,13 @@ def main():
     screen_width, screen_height = dispatcher.screen_size()
     engine = InteractionEngine(screen_width, screen_height)
 
-    print("AirCursor v0.10.2")
+    print("AirCursor v0.11.0")
     print(
         "Right hand = pointer (peace toggles Cursor Mode; index tip moves cursor)."
     )
     print(
-        "Left hand = quick pinch click; hold/move drag; two-finger scroll; "
-        "open-hand swipe for Spaces."
+        "Left hand = thumb+index click/drag; thumb+middle right-click; "
+        "two-finger scroll; open-hand swipe for Spaces."
     )
     print("Press 'q' to quit. Grant Accessibility if input fails.")
 
@@ -92,6 +93,8 @@ def main():
                 dispatcher.set_cursor(command.x, command.y)
             elif isinstance(command, Click):
                 dispatcher.click()
+            elif isinstance(command, RightClick):
+                dispatcher.right_click()
             elif isinstance(command, MouseDown):
                 dispatcher.mouse_down()
             elif isinstance(command, MouseUp):
@@ -101,7 +104,10 @@ def main():
             elif isinstance(command, SwitchSpace):
                 dispatcher.switch_space(command.direction)
 
-        if status.pointing and status.switching_space:
+        if status.pointing and status.right_clicked:
+            label = "R-CLICK"
+            color = (180, 80, 255)
+        elif status.pointing and status.switching_space:
             label = "SPACE"
             color = (200, 100, 255)
         elif status.pointing and status.space_ready:

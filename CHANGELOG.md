@@ -2,6 +2,13 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.11.0]
+
+### Added
+
+- Left-hand thumb + middle pinch → atomic right-click.
+- HUD `R-CLICK` flash; Quartz right mouse down/up via `RightClick` command.
+
 ## [0.10.2]
 
 ### Fixed
