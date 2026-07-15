@@ -2,6 +2,31 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.10.2]
+
+### Fixed
+
+- Space switch uses fast Quartz HID key events (no AppleScript) with realistic
+  key hold timing so Mission Control animation matches Ctrl+Arrow.
+
+## [0.10.1]
+
+### Fixed
+
+- Space swipe: trigger Spaces via System Events (Accessibility), with Quartz
+  Control+Fn+Arrow as fallback — Mission Control often ignored bare CGEvents.
+- Open-palm detection is more tolerant mid-swipe; brief flicker no longer resets.
+- Lower swipe travel threshold; HUD shows `PALM — swipe` while armed.
+
+## [0.10.0]
+
+### Added
+
+- Left-hand five-finger open-palm swipe switches macOS Spaces (Ctrl+Left / Ctrl+Right).
+- `SwitchSpace` command and Quartz keyboard shortcuts.
+- HUD `SPACE` flash when a desktop switch fires.
+- Tunables: `SPACE_SWIPE_THRESHOLD`, `SPACE_SWIPE_COOLDOWN`, `SPACE_SWIPE_INVERT`.
+
 ## [0.9.1]
 
 ### Fixed

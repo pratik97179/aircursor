@@ -3,14 +3,18 @@
 from AppKit import NSScreen
 from Quartz.CoreGraphics import (
     CGEventCreate,
+    CGEventCreateKeyboardEvent,
     CGEventCreateMouseEvent,
     CGEventCreateScrollWheelEvent,
     CGEventGetLocation,
     CGEventPost,
+    CGEventSetFlags,
     CGEventSetIntegerValueField,
     CGEventSourceCreate,
     CGPoint,
     CGWarpMouseCursorPosition,
+    kCGEventFlagMaskControl,
+    kCGEventFlagMaskSecondaryFn,
     kCGEventLeftMouseDown,
     kCGEventLeftMouseDragged,
     kCGEventLeftMouseUp,
@@ -22,6 +26,11 @@ from Quartz.CoreGraphics import (
     kCGScrollEventUnitPixel,
     kCGSessionEventTap,
 )
+
+# HID virtual keycodes
+_KEYCODE_CONTROL = 59
+_KEYCODE_LEFT_ARROW = 123
+_KEYCODE_RIGHT_ARROW = 124
 
 import config
 
@@ -121,6 +130,45 @@ class ActionDispatcher:
         )
         CGEventPost(kCGHIDEventTap, event)
         CGEventPost(kCGSessionEventTap, event)
+
+    def switch_space(self, direction):
+        """Switch macOS Space: -1 = Ctrl+Left, +1 = Ctrl+Right.
+
+        Pure Quartz HID events with realistic key timing — closer to a physical
+        Ctrl+Arrow tap than AppleScript (which adds latency and jank).
+        """
+        import time
+
+        keycode = (
+            _KEYCODE_LEFT_ARROW if direction < 0 else _KEYCODE_RIGHT_ARROW
+        )
+        arrow_flags = kCGEventFlagMaskControl | kCGEventFlagMaskSecondaryFn
+        hold = config.SPACE_KEY_HOLD
+
+        control_down = CGEventCreateKeyboardEvent(
+            self._source, _KEYCODE_CONTROL, True
+        )
+        CGEventSetFlags(control_down, kCGEventFlagMaskControl)
+        CGEventPost(kCGHIDEventTap, control_down)
+
+        time.sleep(0.01)
+
+        key_down = CGEventCreateKeyboardEvent(self._source, keycode, True)
+        CGEventSetFlags(key_down, arrow_flags)
+        CGEventPost(kCGHIDEventTap, key_down)
+
+        time.sleep(hold)
+
+        key_up = CGEventCreateKeyboardEvent(self._source, keycode, False)
+        CGEventSetFlags(key_up, arrow_flags)
+        CGEventPost(kCGHIDEventTap, key_up)
+
+        time.sleep(0.01)
+
+        control_up = CGEventCreateKeyboardEvent(
+            self._source, _KEYCODE_CONTROL, False
+        )
+        CGEventPost(kCGHIDEventTap, control_up)
 
     def sync_from_os(self):
         self._x, self._y = self._read_os_cursor()

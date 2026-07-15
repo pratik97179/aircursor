@@ -1,4 +1,4 @@
-"""Click-hand pinch edges and two-finger scroll tracking."""
+"""Click-hand pinch, two-finger scroll, and five-finger space swipe."""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -19,6 +19,8 @@ class ClickHandSignal:
     pinched: bool
     scrolling: bool
     scroll_point: tuple[float, float] | None
+    open_palm: bool
+    palm_point: tuple[float, float] | None
 
 
 def _hand_scale(hand):
@@ -45,6 +47,30 @@ def is_two_finger_pose(hand):
     return index_up and middle_up and ring_down and pinky_down
 
 
+def _finger_extended(hand, tip_i, pip_i):
+    """Prefer tip above PIP; also accept tip clearly farther from wrist."""
+    tip = hand[tip_i]
+    pip = hand[pip_i]
+    wrist = hand[0]
+    if tip.y < pip.y:
+        return True
+    tip_d = hypot(tip.x - wrist.x, tip.y - wrist.y)
+    pip_d = hypot(pip.x - wrist.x, pip.y - wrist.y)
+    return tip_d > pip_d * 1.15
+
+
+def is_open_palm(hand):
+    """Four fingers extended and thumb not pinched — five-finger open hand."""
+    fingers = (
+        _finger_extended(hand, 8, 6)
+        and _finger_extended(hand, 12, 10)
+        and _finger_extended(hand, 16, 14)
+        and _finger_extended(hand, 20, 18)
+    )
+    thumb_open = pinch_ratio(hand) >= config.PINCH_EXIT
+    return fingers and thumb_open
+
+
 def two_finger_point(hand):
     """Midpoint of index and middle tips (trackpad contact proxy)."""
     return (
@@ -53,12 +79,22 @@ def two_finger_point(hand):
     )
 
 
+def palm_point(hand):
+    """Palm proxy: average of wrist + finger MCPs."""
+    pts = (hand[0], hand[5], hand[9], hand[13], hand[17])
+    return (
+        sum(p.x for p in pts) / 5.0,
+        sum(p.y for p in pts) / 5.0,
+    )
+
+
 class GestureEngine:
     """
     Click-hand signals:
-    - pinch edges for click
-    - two-finger pose + motion point for scroll
-    Pinch wins over scroll when active.
+    - pinch edges for click/drag
+    - two-finger pose for scroll
+    - open palm for Spaces swipe
+    Priority: pinch > open palm > two-finger scroll.
     """
 
     def __init__(self):
@@ -78,6 +114,8 @@ class GestureEngine:
                 pinched=False,
                 scrolling=False,
                 scroll_point=None,
+                open_palm=False,
+                palm_point=None,
             )
 
         ratio = pinch_ratio(hand)
@@ -90,17 +128,21 @@ class GestureEngine:
             self._pinched = False
             gesture = Gesture.PINCH_UP
 
+        open_palm = not self._pinched and is_open_palm(hand)
         scrolling = (
             not self._pinched
+            and not open_palm
             and is_two_finger_pose(hand)
         )
-        scroll_point = two_finger_point(hand) if scrolling else None
 
         return ClickHandSignal(
             gesture=gesture,
             pinched=self._pinched,
             scrolling=scrolling,
-            scroll_point=scroll_point,
+            scroll_point=two_finger_point(hand) if scrolling else None,
+            open_palm=open_palm,
+            # Always expose palm so Space swipe can ride brief detection dropouts.
+            palm_point=palm_point(hand),
         )
 
     @property

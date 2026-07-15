@@ -1,6 +1,6 @@
 [project]
 name = "aircursor"
-version = "0.9.1"
+version = "0.10.2"
 description = "Hands-free macOS cursor control via webcam hand tracking"
 readme = "README.md"
 requires-python = ">=3.14"

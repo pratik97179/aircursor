@@ -37,12 +37,20 @@ class Scroll:
 
 
 @dataclass(frozen=True)
+class SwitchSpace:
+    """direction: -1 = previous (Ctrl+Left), +1 = next (Ctrl+Right)."""
+    direction: int
+
+
+@dataclass(frozen=True)
 class EngineStatus:
     pointing: bool
     pose: Pose
     pinched: bool
     scrolling: bool
     dragging: bool
+    switching_space: bool
+    space_ready: bool
 
 
 class InteractionEngine:
@@ -57,7 +65,6 @@ class InteractionEngine:
         self._system_latched = False
         self._last_press_t = None
 
-        # Pinch resolution: pending → Click on quick release, or MouseDown for drag.
         self._pinch_pending = False
         self._pinch_start_t = None
         self._pinch_start_tip = None
@@ -69,16 +76,26 @@ class InteractionEngine:
 
         self._prev_scroll_point = None
 
+        self._space_origin = None
+        self._space_armed = False
+        self._space_last_seen_t = None
+        self._last_space_t = None
+        self._space_flash = False
+        self._space_ready = False
+
     def update(self, filtered_hand, pose, click_signal, cursor_pos, t):
         commands = []
+        self._space_flash = False
 
         self._handle_system_pose(pose, filtered_hand, t, commands)
         self._handle_pinch(filtered_hand, click_signal, t, commands)
+        self._handle_space_swipe(click_signal, t, commands)
 
         if (
             self.pointing
             and not self._primary_down
             and not self._pinch_pending
+            and not self._space_ready
             and click_signal.scrolling
             and click_signal.scroll_point
         ):
@@ -95,6 +112,7 @@ class InteractionEngine:
 
         can_move = (
             self.pointing
+            and not self._space_ready
             and filtered_hand.tip is not None
             and filtered_hand.tip_valid
         )
@@ -131,11 +149,70 @@ class InteractionEngine:
                 self.pointing
                 and not self._primary_down
                 and not self._pinch_pending
+                and not self._space_ready
                 and click_signal.scrolling
             ),
             dragging=bool(self.pointing and self._primary_down),
+            switching_space=self._space_flash,
+            space_ready=self._space_ready,
         )
         return status, commands
+
+    def _handle_space_swipe(self, click_signal, t, commands):
+        palm_now = (
+            click_signal.open_palm
+            and click_signal.palm_point is not None
+            and self.pointing
+            and not self._primary_down
+            and not self._pinch_pending
+        )
+
+        if palm_now:
+            self._space_last_seen_t = t
+            palm = click_signal.palm_point
+            if self._space_origin is None:
+                self._space_origin = palm
+                self._space_armed = True
+            self._space_ready = True
+        elif (
+            self._space_ready
+            and self._space_last_seen_t is not None
+            and t - self._space_last_seen_t <= config.SPACE_PALM_GRACE
+            and click_signal.palm_point is not None
+            and self.pointing
+            and not self._primary_down
+            and not self._pinch_pending
+        ):
+            # Keep last palm / grace tracking only while landmarks still arrive.
+            palm = click_signal.palm_point
+        else:
+            self._space_origin = None
+            self._space_armed = False
+            self._space_ready = False
+            self._space_last_seen_t = None
+            return
+
+        if not self._space_armed or self._space_origin is None:
+            return
+
+        dx = palm[0] - self._space_origin[0]
+        if abs(dx) < config.SPACE_SWIPE_THRESHOLD:
+            return
+
+        if self._last_space_t is not None:
+            if t - self._last_space_t < config.SPACE_SWIPE_COOLDOWN:
+                return
+
+        direction = -1 if dx < 0 else 1
+        if config.SPACE_SWIPE_INVERT:
+            direction = -direction
+
+        commands.append(SwitchSpace(direction=direction))
+        self._last_space_t = t
+        self._space_armed = False
+        self._space_flash = True
+        # Require a new open-palm raise before the next switch.
+        self._space_origin = palm
 
     def _handle_pinch(self, filtered_hand, click_signal, t, commands):
         tip = filtered_hand.tip
@@ -233,6 +310,10 @@ class InteractionEngine:
             self._pinch_pending = False
             self._pinch_start_t = None
             self._pinch_start_tip = None
+            self._space_origin = None
+            self._space_armed = False
+            self._space_ready = False
+            self._space_last_seen_t = None
             self.pointing = False
             self._tracking_active = False
             self._prev_tip = None

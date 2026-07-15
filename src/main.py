@@ -16,6 +16,7 @@ from interaction_engine import (
     MouseUp,
     Scroll,
     SetCursor,
+    SwitchSpace,
 )
 from landmark_filter import LandmarkFilter
 from pose_classifier import PoseClassifier
@@ -31,12 +32,13 @@ def main():
     screen_width, screen_height = dispatcher.screen_size()
     engine = InteractionEngine(screen_width, screen_height)
 
-    print("AirCursor v0.9.1")
+    print("AirCursor v0.10.2")
     print(
         "Right hand = pointer (peace toggles Cursor Mode; index tip moves cursor)."
     )
     print(
-        "Left hand = quick pinch to click; hold/move to drag; two-finger swipe to scroll."
+        "Left hand = quick pinch click; hold/move drag; two-finger scroll; "
+        "open-hand swipe for Spaces."
     )
     print("Press 'q' to quit. Grant Accessibility if input fails.")
 
@@ -96,8 +98,16 @@ def main():
                 dispatcher.mouse_up()
             elif isinstance(command, Scroll):
                 dispatcher.scroll(command.dx, command.dy)
+            elif isinstance(command, SwitchSpace):
+                dispatcher.switch_space(command.direction)
 
-        if status.pointing and status.dragging:
+        if status.pointing and status.switching_space:
+            label = "SPACE"
+            color = (200, 100, 255)
+        elif status.pointing and status.space_ready:
+            label = "PALM — swipe"
+            color = (200, 100, 255)
+        elif status.pointing and status.dragging:
             label = "DRAG"
             color = (0, 200, 255)
         elif status.pointing and status.scrolling:

@@ -56,6 +56,13 @@ SCROLL_GAIN_X = 1400.0
 SCROLL_DEAD_ZONE = 0.0015  # ignore tiny jitter
 SCROLL_NATURAL = True  # True = MacBook-like (fingers push content)
 
+# Five-finger open-hand horizontal swipe → switch macOS Spaces (Ctrl+Arrow).
+SPACE_SWIPE_THRESHOLD = 0.06  # normalized palm travel to fire one switch
+SPACE_SWIPE_COOLDOWN = 0.55  # seconds between space switches
+SPACE_SWIPE_INVERT = False  # True swaps left/right mapping
+SPACE_PALM_GRACE = 0.5  # keep armed briefly if open-palm flickers mid-swipe
+SPACE_KEY_HOLD = 0.04  # seconds between arrow down/up (matches a real tap)
+
 # Cursor gain (screen pixels per normalized hand delta).
 # Slow motion uses MIN for icon aiming; fast motion ramps toward MAX.
 
