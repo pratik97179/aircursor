@@ -9,7 +9,13 @@ from action_dispatcher import ActionDispatcher
 from camera import Camera
 from gesture_engine import GestureEngine
 from hand_tracker import HandTracker
-from interaction_engine import Click, InteractionEngine, Scroll, SetCursor
+from interaction_engine import (
+    InteractionEngine,
+    MouseDown,
+    MouseUp,
+    Scroll,
+    SetCursor,
+)
 from landmark_filter import LandmarkFilter
 from pose_classifier import PoseClassifier
 
@@ -24,14 +30,14 @@ def main():
     screen_width, screen_height = dispatcher.screen_size()
     engine = InteractionEngine(screen_width, screen_height)
 
-    print("AirCursor v0.8")
+    print("AirCursor v0.9")
     print(
         "Right hand = pointer (peace toggles Cursor Mode; index tip moves cursor)."
     )
     print(
-        "Left hand = pinch to click; two-finger swipe (index+middle) to scroll."
+        "Left hand = pinch hold to click/drag; two-finger swipe to scroll."
     )
-    print("Press 'q' to quit. Grant Accessibility if cursor/click/scroll fail.")
+    print("Press 'q' to quit. Grant Accessibility if input fails.")
 
     start = time.monotonic()
 
@@ -81,17 +87,19 @@ def main():
         for command in commands:
             if isinstance(command, SetCursor):
                 dispatcher.set_cursor(command.x, command.y)
-            elif isinstance(command, Click):
-                dispatcher.click()
+            elif isinstance(command, MouseDown):
+                dispatcher.mouse_down()
+            elif isinstance(command, MouseUp):
+                dispatcher.mouse_up()
             elif isinstance(command, Scroll):
                 dispatcher.scroll(command.dx, command.dy)
 
-        if status.pointing and status.scrolling:
+        if status.pointing and status.dragging:
+            label = "DRAG"
+            color = (0, 200, 255)
+        elif status.pointing and status.scrolling:
             label = "SCROLL"
             color = (255, 180, 0)
-        elif status.pointing and status.pinched:
-            label = "CLICK"
-            color = (255, 200, 0)
         elif status.pointing:
             label = "CURSOR MODE"
             color = (0, 255, 0)

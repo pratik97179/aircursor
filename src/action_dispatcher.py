@@ -1,7 +1,5 @@
 """macOS cursor I/O. No interaction policy."""
 
-import time
-
 from AppKit import NSScreen
 from Quartz.CoreGraphics import (
     CGEventCreate,
@@ -14,6 +12,7 @@ from Quartz.CoreGraphics import (
     CGPoint,
     CGWarpMouseCursorPosition,
     kCGEventLeftMouseDown,
+    kCGEventLeftMouseDragged,
     kCGEventLeftMouseUp,
     kCGEventMouseMoved,
     kCGEventSourceStateHIDSystemState,
@@ -35,10 +34,10 @@ class ActionDispatcher:
         self._screen_height = float(screen.size.height)
         self._source = CGEventSourceCreate(kCGEventSourceStateHIDSystemState)
 
-        # Track last warped position so the hot loop avoids CGEventCreate.
         x, y = self._read_os_cursor()
         self._x = x
         self._y = y
+        self._button_down = False
         self._last_move_event_t = 0.0
         hz = config.MOUSE_MOVE_EVENT_HZ
         self._move_event_interval = (1.0 / hz) if hz > 0 else 0.0
@@ -50,36 +49,49 @@ class ActionDispatcher:
         return self._x, self._y
 
     def set_cursor(self, x, y):
+        import time
+
         x = max(0.0, min(x, self._screen_width - 1.0))
         y = max(0.0, min(y, self._screen_height - 1.0))
         CGWarpMouseCursorPosition(CGPoint(x, y))
         self._x = x
         self._y = y
 
-        # Throttle move events — posting both taps every frame is very costly.
         now = time.monotonic()
         if (
             self._move_event_interval == 0.0
             or now - self._last_move_event_t >= self._move_event_interval
         ):
-            self._post_mouse(kCGEventMouseMoved, x, y, dual_tap=False)
+            event_type = (
+                kCGEventLeftMouseDragged
+                if self._button_down
+                else kCGEventMouseMoved
+            )
+            # Dragged events need dual tap more often for Finder/apps.
+            self._post_mouse(
+                event_type,
+                x,
+                y,
+                dual_tap=self._button_down,
+            )
             self._last_move_event_t = now
 
-    def click(self):
+    def mouse_down(self):
         x, y = self._x, self._y
-        # Dual-tap move + click for stubborn targets (Zoom, Electron).
         self._post_mouse(kCGEventMouseMoved, x, y, dual_tap=True)
-        time.sleep(0.01)
         self._post_mouse(
             kCGEventLeftMouseDown, x, y, click_state=1, dual_tap=True
         )
-        time.sleep(0.02)
+        self._button_down = True
+
+    def mouse_up(self):
+        x, y = self._x, self._y
         self._post_mouse(
             kCGEventLeftMouseUp, x, y, click_state=1, dual_tap=True
         )
+        self._button_down = False
 
     def scroll(self, dx, dy):
-        """Pixel scroll. dy > 0 scrolls content up (with SCROLL_NATURAL mapping)."""
         wheel_y = int(round(dy))
         wheel_x = int(round(dx))
         if wheel_y == 0 and wheel_x == 0:
@@ -96,7 +108,6 @@ class ActionDispatcher:
         CGEventPost(kCGSessionEventTap, event)
 
     def sync_from_os(self):
-        """Refresh cached position (e.g. after external mouse move while idle)."""
         self._x, self._y = self._read_os_cursor()
         return self._x, self._y
 

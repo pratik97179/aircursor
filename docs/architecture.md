@@ -22,7 +22,7 @@ Camera
 | Role | Default | Responsibility |
 |------|---------|----------------|
 | Pointer | `Right` | Peace toggle, index-tip cursor move |
-| Click / Navigate | `Left` | Pinch → click; index+middle swipe → scroll |
+| Click / Navigate | `Left` | Pinch → click; hold pinch + pointer move → drag; two-finger swipe → scroll |
 
 `SWAP_HANDEDNESS_FOR_MIRROR` keeps labels matched to the mirrored preview.
 
@@ -51,7 +51,8 @@ Camera
 
 ### InteractionEngine
 - Pointing mode + SYSTEM hold
-- Commands: `SetCursor`, `Click`, `Scroll` (natural trackpad mapping)
+- Commands: `SetCursor`, `MouseDown`, `MouseUp`, `Scroll`
+- Pinch hold + pointer move = drag; brief pinch = click
 
 ### ActionDispatcher
 - Cursor warp + throttled mouse-move events

@@ -15,14 +15,19 @@ class SetCursor:
 
 
 @dataclass(frozen=True)
-class Click:
+class MouseDown:
+    pass
+
+
+@dataclass(frozen=True)
+class MouseUp:
     pass
 
 
 @dataclass(frozen=True)
 class Scroll:
-    dx: float  # horizontal pixel units (positive = content right / natural)
-    dy: float  # vertical pixel units (positive = content up when natural)
+    dx: float
+    dy: float
 
 
 @dataclass(frozen=True)
@@ -31,6 +36,7 @@ class EngineStatus:
     pose: Pose
     pinched: bool
     scrolling: bool
+    dragging: bool
 
 
 class InteractionEngine:
@@ -43,7 +49,8 @@ class InteractionEngine:
 
         self._system_hold_start = None
         self._system_latched = False
-        self._last_click_t = None
+        self._last_mouse_down_t = None
+        self._primary_down = False
 
         self._prev_tip = None
         self._prev_t = None
@@ -54,18 +61,26 @@ class InteractionEngine:
     def update(self, filtered_hand, pose, click_signal, cursor_pos, t):
         commands = []
 
-        self._handle_system_pose(pose, filtered_hand, t)
+        self._handle_system_pose(pose, filtered_hand, t, commands)
+
+        # Pinch hold = button down (click if brief, drag if move while held).
+        if self.pointing and click_signal.gesture == Gesture.PINCH_DOWN:
+            if not self._primary_down and self._mouse_down_allowed(t):
+                commands.append(MouseDown())
+                self._primary_down = True
+                self._last_mouse_down_t = t
+                self._prev_scroll_point = None
+
+        if click_signal.gesture == Gesture.PINCH_UP and self._primary_down:
+            commands.append(MouseUp())
+            self._primary_down = False
 
         if (
             self.pointing
-            and click_signal.gesture == Gesture.PINCH_DOWN
-            and self._click_allowed(t)
+            and not self._primary_down
+            and click_signal.scrolling
+            and click_signal.scroll_point
         ):
-            commands.append(Click())
-            self._last_click_t = t
-            self._prev_scroll_point = None
-
-        if self.pointing and click_signal.scrolling and click_signal.scroll_point:
             point = click_signal.scroll_point
             if self._prev_scroll_point is not None:
                 dx = point[0] - self._prev_scroll_point[0]
@@ -112,13 +127,15 @@ class InteractionEngine:
             pose=pose,
             pinched=click_signal.pinched,
             scrolling=bool(
-                self.pointing and click_signal.scrolling
+                self.pointing
+                and not self._primary_down
+                and click_signal.scrolling
             ),
+            dragging=bool(self.pointing and self._primary_down),
         )
         return status, commands
 
     def _scroll_from_delta(self, dx, dy):
-        # Image y grows downward; fingers moving up ⇒ negative dy.
         sx = dx * config.SCROLL_GAIN_X
         sy = dy * config.SCROLL_GAIN
         if config.SCROLL_NATURAL:
@@ -133,10 +150,10 @@ class InteractionEngine:
 
         return Scroll(dx=sx, dy=sy)
 
-    def _click_allowed(self, t):
-        if self._last_click_t is None:
+    def _mouse_down_allowed(self, t):
+        if self._last_mouse_down_t is None:
             return True
-        return t - self._last_click_t >= config.CLICK_DEBOUNCE
+        return t - self._last_mouse_down_t >= config.CLICK_DEBOUNCE
 
     def _gain_for_speed(self, speed):
         ref = config.CURSOR_GAIN_SPEED_REF
@@ -149,7 +166,7 @@ class InteractionEngine:
             config.CURSOR_GAIN_MAX - config.CURSOR_GAIN_MIN
         ) * blend
 
-    def _handle_system_pose(self, pose, filtered_hand, t):
+    def _handle_system_pose(self, pose, filtered_hand, t, commands):
         if pose != Pose.SYSTEM:
             self._system_hold_start = None
             self._system_latched = False
@@ -162,10 +179,13 @@ class InteractionEngine:
 
         if held and not self._system_latched:
             self._system_latched = True
-            self._toggle_pointing(filtered_hand)
+            self._toggle_pointing(filtered_hand, commands)
 
-    def _toggle_pointing(self, filtered_hand):
+    def _toggle_pointing(self, filtered_hand, commands):
         if self.pointing:
+            if self._primary_down:
+                commands.append(MouseUp())
+                self._primary_down = False
             self.pointing = False
             self._tracking_active = False
             self._prev_tip = None

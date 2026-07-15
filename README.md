@@ -2,17 +2,15 @@
 
 Hands-free macOS cursor control using a laptop webcam and MediaPipe hand tracking.
 
-AirCursor is built in public. v0.8 adds trackpad-style two-finger scroll on the click hand.
+AirCursor is built in public. v0.9 adds pinch-hold drag.
 
 ## What works today
 
 1. Detect up to two hands from the built-in webcam.
 2. **Pointer hand** (Right) — index fingertip moves the cursor; peace toggles **Cursor Mode**.
-3. **Click hand** (Left) — **pinch** to left-click.
-4. **Click hand** — **two-finger swipe** (index + middle) to scroll like a MacBook trackpad.
+3. **Click hand** (Left) — **pinch** briefly to click; **hold pinch + move pointer** to drag.
+4. **Click hand** — **two-finger swipe** (index + middle) to scroll.
 5. Swap roles in `src/config.py` if needed.
-
-Drag is not implemented yet.
 
 ## Requirements
 

@@ -2,6 +2,19 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.9.0]
+
+### Added
+
+- Drag via left-hand pinch hold + right-hand move (`MouseDown` / `MouseUp`).
+- Left-mouse-dragged events while the button is held so Finder/apps track drags.
+- HUD `DRAG` state while pinched in Cursor Mode.
+
+### Changed
+
+- Short pinch still acts as a click (down then up); hold + move drags.
+- Cursor mode off while held forces mouse-up so the button cannot stick.
+
 ## [0.8.0]
 
 ### Added
