@@ -2,6 +2,15 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.4.0]
+
+### Added
+
+- Introduced a dedicated cursor controller.
+- Added an active tracking region for cursor control.
+- Mapped the active region to the full display.
+- Applied cursor smoothing.
+
 ## [0.3.0]
 
 ### Added

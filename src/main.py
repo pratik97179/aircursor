@@ -1,57 +1,67 @@
 import cv2
 
 from hand_tracker import HandTracker
-
+from cursor_controller import CursorController
 
 camera = cv2.VideoCapture(0)
+
 tracker = HandTracker()
+cursor = CursorController()
 
 print("Press 'q' to quit.")
 
 while True:
+
     success, frame = camera.read()
 
     if not success:
         break
 
-    # Run hand landmark detection on the current frame.
+    frame = cv2.flip(frame, 1)
+
     result = tracker.detect(frame)
 
     if result.hand_landmarks:
-        # Draw all detected hand landmarks.
+
         frame = tracker.draw_landmarks(frame, result)
 
-        # Highlight the index fingertip.
         index_tip = tracker.get_index_tip(result)
 
-        height, width, _ = frame.shape
+        frame_height, frame_width, _ = frame.shape
 
-        # Convert normalized landmark coordinates to pixel coordinates.
-        x = int(index_tip.x * width)
-        y = int(index_tip.y * height)
+        camera_x = int(index_tip.x * frame_width)
+        camera_y = int(index_tip.y * frame_height)
+
+        cursor.move(
+            index_tip.x,
+            index_tip.y,
+        )
+
+        # Draw active region
+        cv2.rectangle(
+            frame,
+            (
+                int(cursor.min_x * frame_width),
+                int(cursor.min_y * frame_height),
+            ),
+            (
+                int(cursor.max_x * frame_width),
+                int(cursor.max_y * frame_height),
+            ),
+            (255, 255, 0),
+            2,
+        )
 
         cv2.circle(
             frame,
-            (x, y),
+            (camera_x, camera_y),
             10,
             (0, 0, 255),
             -1,
         )
 
-        # Display the fingertip coordinates next to the marker.
-        cv2.putText(
-            frame,
-            f"({x}, {y})",
-            (x + 15, y - 15),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            (255, 255, 255),
-            2,
-        )
-
     cv2.imshow("AirCursor", frame)
 
-    # Exit the application when 'q' is pressed.
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
