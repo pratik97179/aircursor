@@ -2,6 +2,19 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.8.0]
+
+### Added
+
+- Left-hand two-finger swipe scroll (index + middle), MacBook trackpad-style.
+- `Scroll` command and Quartz pixel scroll wheel events (vertical + horizontal).
+- HUD `SCROLL` state while two-finger scrolling in Cursor Mode.
+
+### Changed
+
+- GestureEngine reports click-hand pinch and two-finger scroll point together.
+- Pinch still wins over scroll when active.
+
 ## [0.7.0]
 
 ### Added

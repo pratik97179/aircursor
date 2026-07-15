@@ -43,6 +43,14 @@ PINCH_ENTER = 0.35
 PINCH_EXIT = 0.45
 CLICK_DEBOUNCE = 0.35  # seconds between clicks
 
+# Two-finger scroll on the click hand (index + middle up, like a trackpad).
+# Positive hand motion up (decreasing y) → natural content scroll up.
+
+SCROLL_GAIN = 1800.0  # normalized hand delta → pixel scroll units
+SCROLL_GAIN_X = 1400.0
+SCROLL_DEAD_ZONE = 0.0015  # ignore tiny jitter
+SCROLL_NATURAL = True  # True = MacBook-like (fingers push content)
+
 # Cursor gain (screen pixels per normalized hand delta).
 # Slow motion uses MIN for icon aiming; fast motion ramps toward MAX.
 

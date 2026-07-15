@@ -20,10 +20,17 @@ class Click:
 
 
 @dataclass(frozen=True)
+class Scroll:
+    dx: float  # horizontal pixel units (positive = content right / natural)
+    dy: float  # vertical pixel units (positive = content up when natural)
+
+
+@dataclass(frozen=True)
 class EngineStatus:
     pointing: bool
     pose: Pose
     pinched: bool
+    scrolling: bool
 
 
 class InteractionEngine:
@@ -40,23 +47,36 @@ class InteractionEngine:
 
         self._prev_tip = None
         self._prev_t = None
-        # False while tip is missing/outside region so resume can re-anchor.
         self._tracking_active = False
 
-    def update(self, filtered_hand, pose, gesture, pinched, cursor_pos, t):
+        self._prev_scroll_point = None
+
+    def update(self, filtered_hand, pose, click_signal, cursor_pos, t):
         commands = []
 
         self._handle_system_pose(pose, filtered_hand, t)
 
         if (
             self.pointing
-            and gesture == Gesture.PINCH_DOWN
+            and click_signal.gesture == Gesture.PINCH_DOWN
             and self._click_allowed(t)
         ):
             commands.append(Click())
             self._last_click_t = t
+            self._prev_scroll_point = None
 
-        # Pointer hand is independent of click-hand pinch; never freeze for click.
+        if self.pointing and click_signal.scrolling and click_signal.scroll_point:
+            point = click_signal.scroll_point
+            if self._prev_scroll_point is not None:
+                dx = point[0] - self._prev_scroll_point[0]
+                dy = point[1] - self._prev_scroll_point[1]
+                scroll = self._scroll_from_delta(dx, dy)
+                if scroll is not None:
+                    commands.append(scroll)
+            self._prev_scroll_point = point
+        else:
+            self._prev_scroll_point = None
+
         can_move = (
             self.pointing
             and filtered_hand.tip is not None
@@ -90,9 +110,28 @@ class InteractionEngine:
         status = EngineStatus(
             pointing=self.pointing,
             pose=pose,
-            pinched=pinched,
+            pinched=click_signal.pinched,
+            scrolling=bool(
+                self.pointing and click_signal.scrolling
+            ),
         )
         return status, commands
+
+    def _scroll_from_delta(self, dx, dy):
+        # Image y grows downward; fingers moving up ⇒ negative dy.
+        sx = dx * config.SCROLL_GAIN_X
+        sy = dy * config.SCROLL_GAIN
+        if config.SCROLL_NATURAL:
+            sx = -sx
+            sy = -sy
+
+        if (
+            abs(sx) < config.SCROLL_DEAD_ZONE * config.SCROLL_GAIN_X
+            and abs(sy) < config.SCROLL_DEAD_ZONE * config.SCROLL_GAIN
+        ):
+            return None
+
+        return Scroll(dx=sx, dy=sy)
 
     def _click_allowed(self, t):
         if self._last_click_t is None:
@@ -100,7 +139,6 @@ class InteractionEngine:
         return t - self._last_click_t >= config.CLICK_DEBOUNCE
 
     def _gain_for_speed(self, speed):
-        """Low speed → precise; high speed → faster travel."""
         ref = config.CURSOR_GAIN_SPEED_REF
         if ref <= 0.0:
             return config.CURSOR_GAIN_MIN
@@ -132,6 +170,7 @@ class InteractionEngine:
             self._tracking_active = False
             self._prev_tip = None
             self._prev_t = None
+            self._prev_scroll_point = None
             return
 
         if filtered_hand.tip is None:
@@ -141,3 +180,4 @@ class InteractionEngine:
         self._prev_tip = filtered_hand.tip
         self._prev_t = None
         self._tracking_active = filtered_hand.tip_valid
+        self._prev_scroll_point = None

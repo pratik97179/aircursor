@@ -4,14 +4,14 @@ import time
 
 import cv2
 
+import config
 from action_dispatcher import ActionDispatcher
 from camera import Camera
 from gesture_engine import GestureEngine
 from hand_tracker import HandTracker
-from interaction_engine import Click, InteractionEngine, SetCursor
+from interaction_engine import Click, InteractionEngine, Scroll, SetCursor
 from landmark_filter import LandmarkFilter
 from pose_classifier import PoseClassifier
-import config
 
 
 def main():
@@ -24,14 +24,14 @@ def main():
     screen_width, screen_height = dispatcher.screen_size()
     engine = InteractionEngine(screen_width, screen_height)
 
-    print("AirCursor v0.7")
+    print("AirCursor v0.8")
     print(
         "Right hand = pointer (peace toggles Cursor Mode; index tip moves cursor)."
     )
     print(
-        "Left hand = click (pinch thumb + index to left-click)."
+        "Left hand = pinch to click; two-finger swipe (index+middle) to scroll."
     )
-    print("Press 'q' to quit. Grant Accessibility if cursor/click fail.")
+    print("Press 'q' to quit. Grant Accessibility if cursor/click/scroll fail.")
 
     start = time.monotonic()
 
@@ -63,9 +63,8 @@ def main():
         now = time.monotonic()
         filtered = landmark_filter.update(pointer_hand, tip, now)
         pose = pose_classifier.classify(filtered.hand)
-        gesture = gesture_engine.detect(click_hand)
+        click_signal = gesture_engine.observe(click_hand)
 
-        # While not actively pointing, resync from OS (user may move mouse).
         if engine.pointing:
             cursor_pos = dispatcher.cursor_position()
         else:
@@ -74,8 +73,7 @@ def main():
         status, commands = engine.update(
             filtered,
             pose,
-            gesture,
-            gesture_engine.is_pinched,
+            click_signal,
             cursor_pos,
             now,
         )
@@ -85,8 +83,13 @@ def main():
                 dispatcher.set_cursor(command.x, command.y)
             elif isinstance(command, Click):
                 dispatcher.click()
+            elif isinstance(command, Scroll):
+                dispatcher.scroll(command.dx, command.dy)
 
-        if status.pointing and status.pinched:
+        if status.pointing and status.scrolling:
+            label = "SCROLL"
+            color = (255, 180, 0)
+        elif status.pointing and status.pinched:
             label = "CLICK"
             color = (255, 200, 0)
         elif status.pointing:

@@ -6,6 +6,7 @@ from AppKit import NSScreen
 from Quartz.CoreGraphics import (
     CGEventCreate,
     CGEventCreateMouseEvent,
+    CGEventCreateScrollWheelEvent,
     CGEventGetLocation,
     CGEventPost,
     CGEventSetIntegerValueField,
@@ -19,6 +20,7 @@ from Quartz.CoreGraphics import (
     kCGHIDEventTap,
     kCGMouseButtonLeft,
     kCGMouseEventClickState,
+    kCGScrollEventUnitPixel,
     kCGSessionEventTap,
 )
 
@@ -75,6 +77,23 @@ class ActionDispatcher:
         self._post_mouse(
             kCGEventLeftMouseUp, x, y, click_state=1, dual_tap=True
         )
+
+    def scroll(self, dx, dy):
+        """Pixel scroll. dy > 0 scrolls content up (with SCROLL_NATURAL mapping)."""
+        wheel_y = int(round(dy))
+        wheel_x = int(round(dx))
+        if wheel_y == 0 and wheel_x == 0:
+            return
+
+        event = CGEventCreateScrollWheelEvent(
+            self._source,
+            kCGScrollEventUnitPixel,
+            2,
+            wheel_y,
+            wheel_x,
+        )
+        CGEventPost(kCGHIDEventTap, event)
+        CGEventPost(kCGSessionEventTap, event)
 
     def sync_from_os(self):
         """Refresh cached position (e.g. after external mouse move while idle)."""
