@@ -2,6 +2,21 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.5.0]
+
+### Added
+
+- Added gesture-based cursor activation using.
+- Added relative cursor movement to eliminate cursor teleportation.
+- Switched cursor control back to the index fingertip.
+- Added gesture activation timing using a monotonic clock.
+
+### Changed
+
+- Refactored CursorController to own its enabled state.
+- Simplified main application loop by delegating cursor state management.
+- Introduced a configurable control point abstraction in HandTracker.
+
 ## [0.4.0]
 
 ### Added

@@ -1,48 +1,65 @@
-import pyautogui
+from AppKit import NSScreen
+from Quartz.CoreGraphics import (
+    CGWarpMouseCursorPosition,
+    CGEventCreate,
+    CGEventGetLocation,
+    CGPoint,
+)
 
 
 class CursorController:
 
     def __init__(self):
 
-        pyautogui.FAILSAFE = False
+        screen = NSScreen.mainScreen().frame()
 
-        self.screen_width, self.screen_height = pyautogui.size()
+        self.screen_width = screen.size.width
+        self.screen_height = screen.size.height
 
-        self.previous_x = self.screen_width / 2
-        self.previous_y = self.screen_height / 2
+        self.anchor_cursor_x = 0
+        self.anchor_cursor_y = 0
 
-        self.smoothing = 0.25
+        self.anchor_hand_x = 0
+        self.anchor_hand_y = 0
 
-        # Active region (normalized coordinates)
-        self.min_x = 0.20
-        self.max_x = 0.80
+        self.enabled = False
 
-        self.min_y = 0.20
-        self.max_y = 0.80
+        self.sensitivity = 2.0
 
-    def move(self, x, y):
+    def toggle(self, hand_x, hand_y):
 
-        # Ignore movement outside the active region.
-        x = min(max(x, self.min_x), self.max_x)
-        y = min(max(y, self.min_y), self.max_y)
+        if self.enabled:
 
-        # Remap active region to the full screen.
-        x = (x - self.min_x) / (self.max_x - self.min_x)
-        y = (y - self.min_y) / (self.max_y - self.min_y)
+            self.enabled = False
+            return
 
-        target_x = x * self.screen_width
-        target_y = y * self.screen_height
+        self.enabled = True
 
-        current_x = self.previous_x + (
-            target_x - self.previous_x
-        ) * self.smoothing
+        event = CGEventCreate(None)
+        location = CGEventGetLocation(event)
 
-        current_y = self.previous_y + (
-            target_y - self.previous_y
-        ) * self.smoothing
+        self.anchor_cursor_x = location.x
+        self.anchor_cursor_y = location.y
 
-        pyautogui.moveTo(current_x, current_y)
+        self.anchor_hand_x = hand_x
+        self.anchor_hand_y = hand_y
 
-        self.previous_x = current_x
-        self.previous_y = current_y
+    def is_enabled(self):
+
+        return self.enabled
+
+    def move(self, hand_x, hand_y):
+
+        if not self.enabled:
+            return
+
+        dx = (hand_x - self.anchor_hand_x) * self.screen_width
+        dy = (hand_y - self.anchor_hand_y) * self.screen_height
+
+        cursor_x = self.anchor_cursor_x + dx * self.sensitivity
+        cursor_y = self.anchor_cursor_y + dy * self.sensitivity
+
+        CGWarpMouseCursorPosition(
+            CGPoint(cursor_x, cursor_y)
+        )
+    

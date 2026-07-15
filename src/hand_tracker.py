@@ -6,8 +6,9 @@ from mediapipe.tasks.python import vision
 
 
 class HandTracker:
+
     def __init__(self):
-        # Load the pre-trained hand landmark detection model.
+
         base_options = python.BaseOptions(
             model_asset_path="models/hand_landmarker.task"
         )
@@ -18,11 +19,16 @@ class HandTracker:
             num_hands=1,
         )
 
-        self.detector = vision.HandLandmarker.create_from_options(options)
+        self.detector = vision.HandLandmarker.create_from_options(
+            options
+        )
 
     def detect(self, frame):
-        # MediaPipe expects RGB images, while OpenCV captures frames in BGR.
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+        rgb = cv2.cvtColor(
+            frame,
+            cv2.COLOR_BGR2RGB,
+        )
 
         image = mp.Image(
             image_format=mp.ImageFormat.SRGB,
@@ -32,13 +38,13 @@ class HandTracker:
         return self.detector.detect(image)
 
     def draw_landmarks(self, frame, detection_result):
-        """Draw all detected hand landmarks on the frame."""
 
         height, width, _ = frame.shape
 
         for hand in detection_result.hand_landmarks:
+
             for landmark in hand:
-                # Convert normalized coordinates (0.0 - 1.0) to image pixels.
+
                 x = int(landmark.x * width)
                 y = int(landmark.y * height)
 
@@ -52,11 +58,12 @@ class HandTracker:
 
         return frame
 
-    def get_index_tip(self, detection_result):
-        """Return the index fingertip landmark of the first detected hand."""
+    def get_control_point(self, detection_result):
 
         if not detection_result.hand_landmarks:
             return None
 
-        # Landmark 8 always represents the index fingertip.
-        return detection_result.hand_landmarks[0][8]
+        hand = detection_result.hand_landmarks[0]
+
+        # Index fingertip (Landmark 8)
+        return hand[8].x, hand[8].y

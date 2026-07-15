@@ -1,11 +1,13 @@
 import cv2
 
-from hand_tracker import HandTracker
 from cursor_controller import CursorController
+from gesture_engine import Gesture, GestureEngine
+from hand_tracker import HandTracker
 
 camera = cv2.VideoCapture(0)
 
 tracker = HandTracker()
+gesture_engine = GestureEngine()
 cursor = CursorController()
 
 print("Press 'q' to quit.")
@@ -25,32 +27,38 @@ while True:
 
         frame = tracker.draw_landmarks(frame, result)
 
-        index_tip = tracker.get_index_tip(result)
+        hand_x, hand_y = tracker.get_control_point(result)
 
         frame_height, frame_width, _ = frame.shape
 
-        camera_x = int(index_tip.x * frame_width)
-        camera_y = int(index_tip.y * frame_height)
+        camera_x = int(hand_x * frame_width)
+        camera_y = int(hand_y * frame_height)
+
+        gesture = gesture_engine.detect(
+            result.hand_landmarks
+        )
+
+        if gesture == Gesture.TOGGLE_CURSOR:
+
+            cursor.toggle(
+                hand_x,
+                hand_y,
+            )
 
         cursor.move(
-            index_tip.x,
-            index_tip.y,
+            hand_x,
+            hand_y,
         )
 
-        # Draw active region
-        cv2.rectangle(
-            frame,
-            (
-                int(cursor.min_x * frame_width),
-                int(cursor.min_y * frame_height),
-            ),
-            (
-                int(cursor.max_x * frame_width),
-                int(cursor.max_y * frame_height),
-            ),
-            (255, 255, 0),
-            2,
-        )
+        if cursor.is_enabled():
+
+            status = "CURSOR MODE"
+            color = (0, 255, 0)
+
+        else:
+
+            status = "IDLE"
+            color = (0, 0, 255)
 
         cv2.circle(
             frame,
@@ -59,6 +67,20 @@ while True:
             (0, 0, 255),
             -1,
         )
+
+        cv2.putText(
+            frame,
+            status,
+            (20, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            color,
+            2,
+        )
+
+    else:
+
+        gesture_engine.detect(None)
 
     cv2.imshow("AirCursor", frame)
 
