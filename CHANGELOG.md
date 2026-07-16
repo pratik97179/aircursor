@@ -2,6 +2,15 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.12.0]
+
+### Changed
+
+- Scroll moved to **right hand**: hold index + middle + ring up (0.2s), then pull
+  vertically for rubber-band scroll. Cursor freezes while scroll intent is active.
+- Left hand no longer scrolls (click, right-click, drag, Spaces only).
+- Peace vs scroll split: ring down = peace; ring up = scroll intent.
+
 ## [0.11.0]
 
 ### Added

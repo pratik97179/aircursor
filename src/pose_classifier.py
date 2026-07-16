@@ -2,6 +2,8 @@
 
 from enum import Enum
 
+from hand_landmarks import is_peace_pose, is_three_finger_scroll_pose
+
 
 class Pose(Enum):
     NONE = "none"
@@ -14,21 +16,19 @@ class PoseClassifier:
     Pointer-hand taxonomy:
     - NONE: no pointer hand
     - SYSTEM: peace (index + middle up, ring + pinky down) — mode toggle
-    - POINT: pointer hand present, otherwise
+    - POINT: pointer hand present otherwise
 
-    Click is not a pointer pose; the other hand pinches via GestureEngine.
+    Three-finger scroll pose (ring up) is never SYSTEM — handled by ScrollIntentEngine.
     """
 
     def classify(self, hand):
         if hand is None:
             return Pose.NONE
 
-        index_up = hand[8].y < hand[6].y
-        middle_up = hand[12].y < hand[10].y
-        ring_down = hand[16].y > hand[14].y
-        pinky_down = hand[20].y > hand[18].y
+        if is_three_finger_scroll_pose(hand):
+            return Pose.POINT
 
-        if index_up and middle_up and ring_down and pinky_down:
+        if is_peace_pose(hand):
             return Pose.SYSTEM
 
         return Pose.POINT

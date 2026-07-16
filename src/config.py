@@ -48,12 +48,15 @@ CLICK_DEBOUNCE = 0.25  # seconds between click/drag arms
 DRAG_SLOP = 0.014  # normalized pointer travel to promote to drag
 DRAG_ARM_HOLD = 0.35  # seconds held still before arming drag
 
-# Two-finger scroll on the click hand (index + middle up, like a trackpad).
-# Positive hand motion up (decreasing y) → natural content scroll up.
+# Pointer-hand three-finger scroll (index + middle + ring up, dwell then rubber-band pull).
+# Positive pull down (increasing y) → natural content scroll down when SCROLL_NATURAL.
 
-SCROLL_GAIN = 1800.0  # normalized hand delta → pixel scroll units
-SCROLL_GAIN_X = 1400.0
-SCROLL_DEAD_ZONE = 0.0015  # ignore tiny jitter
+SCROLL_INTENT_DWELL = 0.2  # seconds three fingers must be held before scroll arms
+SCROLL_RUBBER_GAIN = 2200.0
+SCROLL_RUBBER_EXPONENT = 1.35
+SCROLL_RUBBER_DEAD_ZONE = 2.0  # min incremental wheel units per frame
+SCROLL_REANCHOR_THRESHOLD = 0.008  # normalized; hand near anchor resets strength
+SCROLL_MAX_DELTA_PER_FRAME = 400  # cap wheel units per frame
 SCROLL_NATURAL = True  # True = MacBook-like (fingers push content)
 
 # Five-finger open-hand horizontal swipe → switch macOS Spaces (Ctrl+Arrow).

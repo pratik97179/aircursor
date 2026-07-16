@@ -5,6 +5,7 @@ from math import hypot
 
 import config
 from gesture_engine import Gesture
+from hand_landmarks import finger_up
 from pose_classifier import Pose
 
 
@@ -54,6 +55,8 @@ class EngineStatus:
     pose: Pose
     pinched: bool
     scrolling: bool
+    scroll_dwelling: bool
+    scroll_armed: bool
     dragging: bool
     switching_space: bool
     space_ready: bool
@@ -82,8 +85,7 @@ class InteractionEngine:
         self._prev_tip = None
         self._prev_t = None
         self._tracking_active = False
-
-        self._prev_scroll_point = None
+        self._was_scroll_active = False
 
         self._space_origin = None
         self._space_armed = False
@@ -92,38 +94,57 @@ class InteractionEngine:
         self._space_flash = False
         self._space_ready = False
 
-    def update(self, filtered_hand, pose, click_signal, cursor_pos, t):
+    def update(
+        self,
+        filtered_hand,
+        pose,
+        click_signal,
+        scroll_signal,
+        pointer_hand,
+        cursor_pos,
+        t,
+    ):
         commands = []
         self._space_flash = False
         self._right_flash = False
 
-        self._handle_system_pose(pose, filtered_hand, t, commands)
+        self._handle_system_pose(pose, pointer_hand, filtered_hand, t, commands)
         self._handle_pinch(filtered_hand, click_signal, t, commands)
         self._handle_right_pinch(click_signal, t, commands)
         self._handle_space_swipe(click_signal, t, commands)
 
-        if (
+        scroll_active = (
             self.pointing
-            and not self._primary_down
-            and not self._pinch_pending
-            and not self._right_pending
-            and not self._space_ready
-            and click_signal.scrolling
-            and click_signal.scroll_point
+            and (
+                scroll_signal.dwelling
+                or scroll_signal.armed
+                or scroll_signal.scrolling
+            )
+        )
+
+        if scroll_active and scroll_signal.scrolling:
+            if scroll_signal.delta_y != 0.0 or scroll_signal.delta_x != 0.0:
+                commands.append(
+                    Scroll(dx=scroll_signal.delta_x, dy=scroll_signal.delta_y)
+                )
+
+        if scroll_active and not self._was_scroll_active:
+            self._tracking_active = False
+
+        if (
+            not scroll_active
+            and self._was_scroll_active
+            and filtered_hand.tip is not None
         ):
-            point = click_signal.scroll_point
-            if self._prev_scroll_point is not None:
-                dx = point[0] - self._prev_scroll_point[0]
-                dy = point[1] - self._prev_scroll_point[1]
-                scroll = self._scroll_from_delta(dx, dy)
-                if scroll is not None:
-                    commands.append(scroll)
-            self._prev_scroll_point = point
-        else:
-            self._prev_scroll_point = None
+            self._prev_tip = filtered_hand.tip
+            self._prev_t = t
+            self._tracking_active = True
+
+        self._was_scroll_active = scroll_active
 
         can_move = (
             self.pointing
+            and not scroll_active
             and not self._space_ready
             and filtered_hand.tip is not None
             and filtered_hand.tip_valid
@@ -148,7 +169,7 @@ class InteractionEngine:
 
                 self._prev_tip = tip
                 self._prev_t = t
-        else:
+        elif not scroll_active:
             self._tracking_active = False
             self._prev_tip = None
             self._prev_t = None
@@ -157,13 +178,10 @@ class InteractionEngine:
             pointing=self.pointing,
             pose=pose,
             pinched=click_signal.pinched,
-            scrolling=bool(
-                self.pointing
-                and not self._primary_down
-                and not self._pinch_pending
-                and not self._right_pending
-                and not self._space_ready
-                and click_signal.scrolling
+            scrolling=bool(self.pointing and scroll_signal.scrolling),
+            scroll_dwelling=bool(self.pointing and scroll_signal.dwelling),
+            scroll_armed=bool(
+                self.pointing and scroll_signal.armed and not scroll_signal.scrolling
             ),
             dragging=bool(self.pointing and self._primary_down),
             switching_space=self._space_flash,
@@ -199,7 +217,6 @@ class InteractionEngine:
             and not self._pinch_pending
             and not self._right_pending
         ):
-            # Keep last palm / grace tracking only while landmarks still arrive.
             palm = click_signal.palm_point
         else:
             self._space_origin = None
@@ -227,7 +244,6 @@ class InteractionEngine:
         self._last_space_t = t
         self._space_armed = False
         self._space_flash = True
-        # Require a new open-palm raise before the next switch.
         self._space_origin = palm
 
     def _handle_pinch(self, filtered_hand, click_signal, t, commands):
@@ -243,7 +259,6 @@ class InteractionEngine:
                 self._pinch_pending = True
                 self._pinch_start_t = t
                 self._pinch_start_tip = tip
-                self._prev_scroll_point = None
 
         if self._pinch_pending and click_signal.pinched:
             moved = self._pinch_tip_travel(tip)
@@ -274,7 +289,6 @@ class InteractionEngine:
                 and self._press_allowed(t)
             ):
                 self._right_pending = True
-                self._prev_scroll_point = None
 
         if click_signal.gesture == Gesture.RIGHT_PINCH_UP:
             if self._right_pending:
@@ -290,21 +304,6 @@ class InteractionEngine:
             tip[0] - self._pinch_start_tip[0],
             tip[1] - self._pinch_start_tip[1],
         )
-
-    def _scroll_from_delta(self, dx, dy):
-        sx = dx * config.SCROLL_GAIN_X
-        sy = dy * config.SCROLL_GAIN
-        if config.SCROLL_NATURAL:
-            sx = -sx
-            sy = -sy
-
-        if (
-            abs(sx) < config.SCROLL_DEAD_ZONE * config.SCROLL_GAIN_X
-            and abs(sy) < config.SCROLL_DEAD_ZONE * config.SCROLL_GAIN
-        ):
-            return None
-
-        return Scroll(dx=sx, dy=sy)
 
     def _press_allowed(self, t):
         if self._last_press_t is None:
@@ -322,8 +321,14 @@ class InteractionEngine:
             config.CURSOR_GAIN_MAX - config.CURSOR_GAIN_MIN
         ) * blend
 
-    def _handle_system_pose(self, pose, filtered_hand, t, commands):
+    def _handle_system_pose(self, pose, pointer_hand, filtered_hand, t, commands):
         if pose != Pose.SYSTEM:
+            self._system_hold_start = None
+            self._system_latched = False
+            return
+
+        # Ring lifting before latch means scroll intent, not peace toggle.
+        if pointer_hand is not None and finger_up(pointer_hand, 16, 14):
             self._system_hold_start = None
             self._system_latched = False
             return
@@ -350,11 +355,11 @@ class InteractionEngine:
             self._space_armed = False
             self._space_ready = False
             self._space_last_seen_t = None
+            self._was_scroll_active = False
             self.pointing = False
             self._tracking_active = False
             self._prev_tip = None
             self._prev_t = None
-            self._prev_scroll_point = None
             return
 
         if filtered_hand.tip is None:
@@ -364,4 +369,4 @@ class InteractionEngine:
         self._prev_tip = filtered_hand.tip
         self._prev_t = None
         self._tracking_active = filtered_hand.tip_valid
-        self._prev_scroll_point = None
+        self._was_scroll_active = False
