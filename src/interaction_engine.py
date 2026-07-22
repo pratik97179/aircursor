@@ -5,7 +5,7 @@ from math import hypot
 
 import config
 from gesture_engine import Gesture
-from hand_landmarks import finger_up
+from hand_landmarks import finger_extended, is_three_finger_scroll_pose
 from pose_classifier import Pose
 
 
@@ -59,7 +59,11 @@ class EngineStatus:
     scroll_armed: bool
     dragging: bool
     switching_space: bool
+    space_dwelling: bool
     space_ready: bool
+    space_dwell_progress: float
+    space_anchor: tuple[float, float] | None
+    space_palm: tuple[float, float] | None
     right_clicked: bool
 
 
@@ -90,9 +94,11 @@ class InteractionEngine:
         self._space_origin = None
         self._space_armed = False
         self._space_last_seen_t = None
+        self._space_dwell_start = None
         self._last_space_t = None
         self._space_flash = False
         self._space_ready = False
+        self._space_dwelling = False
 
     def update(
         self,
@@ -109,9 +115,11 @@ class InteractionEngine:
         self._right_flash = False
 
         self._handle_system_pose(pose, pointer_hand, filtered_hand, t, commands)
+        # Palm arbitration before click completion so cancels win over PINCH_UP.
+        self._handle_pinch_cancels(click_signal, t, commands)
+        self._handle_space_swipe(click_signal, t, commands)
         self._handle_pinch(filtered_hand, click_signal, t, commands)
         self._handle_right_pinch(click_signal, t, commands)
-        self._handle_space_swipe(click_signal, t, commands)
 
         scroll_active = (
             self.pointing
@@ -142,10 +150,11 @@ class InteractionEngine:
 
         self._was_scroll_active = scroll_active
 
+        space_active = self._space_ready or self._space_dwelling
         can_move = (
             self.pointing
             and not scroll_active
-            and not self._space_ready
+            and not space_active
             and filtered_hand.tip is not None
             and filtered_hand.tip_valid
         )
@@ -174,6 +183,14 @@ class InteractionEngine:
             self._prev_tip = None
             self._prev_t = None
 
+        space_dwell_progress = 0.0
+        if self._space_dwelling and self._space_dwell_start is not None:
+            space_dwell_progress = min(
+                1.0,
+                (t - self._space_dwell_start)
+                / max(config.SPACE_PALM_DWELL, 1e-6),
+            )
+
         status = EngineStatus(
             pointing=self.pointing,
             pose=pose,
@@ -185,51 +202,106 @@ class InteractionEngine:
             ),
             dragging=bool(self.pointing and self._primary_down),
             switching_space=self._space_flash,
+            space_dwelling=bool(self.pointing and self._space_dwelling),
             space_ready=self._space_ready,
+            space_dwell_progress=space_dwell_progress,
+            space_anchor=self._space_origin,
+            space_palm=click_signal.palm_point,
             right_clicked=self._right_flash,
         )
         return status, commands
 
+    def _clear_space_state(self):
+        self._space_origin = None
+        self._space_armed = False
+        self._space_ready = False
+        self._space_dwelling = False
+        self._space_last_seen_t = None
+        self._space_dwell_start = None
+
+    def _handle_pinch_cancels(self, click_signal, t, commands):
+        """Palm family wins: abort pending clicks; release drag without a click."""
+        if click_signal.gesture == Gesture.PINCH_CANCEL:
+            if self._primary_down:
+                commands.append(MouseUp())
+                self._primary_down = False
+            self._pinch_pending = False
+            self._pinch_start_t = None
+            self._pinch_start_tip = None
+            self._last_press_t = t
+            return
+
+        if click_signal.gesture == Gesture.RIGHT_PINCH_CANCEL:
+            self._right_pending = False
+            self._last_press_t = t
+
     def _handle_space_swipe(self, click_signal, t, commands):
-        palm_now = (
-            click_signal.open_palm
-            and click_signal.palm_point is not None
-            and self.pointing
+        idle_for_space = (
+            self.pointing
             and not self._primary_down
             and not self._pinch_pending
             and not self._right_pending
         )
+        if not idle_for_space:
+            self._clear_space_state()
+            return
 
-        if palm_now:
+        palm = click_signal.palm_point
+        open_now = click_signal.open_palm and palm is not None
+        # Once armed, palm_candidate keeps tracking through mid-swipe thumb flicker
+        # (common when swiping left with the left hand).
+        track_now = palm is not None and (
+            open_now or (self._space_ready and click_signal.palm_candidate)
+        )
+
+        if open_now:
             self._space_last_seen_t = t
-            palm = click_signal.palm_point
-            if self._space_origin is None:
+            if self._space_dwell_start is None:
+                self._space_dwell_start = t
+                self._space_dwelling = True
+                self._space_ready = False
+                self._space_armed = False
+                self._space_origin = None
+
+            held = t - self._space_dwell_start
+            if held < config.SPACE_PALM_DWELL:
+                self._space_dwelling = True
+                self._space_ready = False
+                return
+
+            # Dwell complete — arm and freeze swipe origin (ignore dwell motion).
+            if not self._space_ready:
                 self._space_origin = palm
                 self._space_armed = True
-            self._space_ready = True
+                self._space_ready = True
+            elif not self._space_armed:
+                # Re-arm after a prior switch so the opposite direction can fire.
+                self._space_armed = True
+                if self._space_origin is None:
+                    self._space_origin = palm
+            self._space_dwelling = False
+        elif track_now:
+            self._space_last_seen_t = t
         elif (
             self._space_ready
             and self._space_last_seen_t is not None
             and t - self._space_last_seen_t <= config.SPACE_PALM_GRACE
-            and click_signal.palm_point is not None
-            and self.pointing
-            and not self._primary_down
-            and not self._pinch_pending
-            and not self._right_pending
+            and palm is not None
         ):
-            palm = click_signal.palm_point
+            # Brief landmark dropout while armed — keep tracking palm point.
+            pass
         else:
-            self._space_origin = None
-            self._space_armed = False
-            self._space_ready = False
-            self._space_last_seen_t = None
+            self._clear_space_state()
             return
 
-        if not self._space_armed or self._space_origin is None:
+        if not self._space_armed or self._space_origin is None or palm is None:
             return
 
         dx = palm[0] - self._space_origin[0]
+        dy = palm[1] - self._space_origin[1]
         if abs(dx) < config.SPACE_SWIPE_THRESHOLD:
+            return
+        if abs(dx) < config.SPACE_SWIPE_AXIS_RATIO * abs(dy):
             return
 
         if self._last_space_t is not None:
@@ -242,18 +314,27 @@ class InteractionEngine:
 
         commands.append(SwitchSpace(direction=direction))
         self._last_space_t = t
-        self._space_armed = False
         self._space_flash = True
+        # Re-arm at the fire point so left and right can alternate without
+        # closing the palm.
         self._space_origin = palm
+        self._space_armed = True
+        self._space_ready = True
+        self._space_dwelling = False
 
     def _handle_pinch(self, filtered_hand, click_signal, t, commands):
         tip = filtered_hand.tip
+
+        if click_signal.gesture in (Gesture.PINCH_CANCEL, Gesture.RIGHT_PINCH_CANCEL):
+            return
 
         if self.pointing and click_signal.gesture == Gesture.PINCH_DOWN:
             if (
                 not self._pinch_pending
                 and not self._primary_down
                 and not self._right_pending
+                and not self._space_ready
+                and not self._space_dwelling
                 and self._press_allowed(t)
             ):
                 self._pinch_pending = True
@@ -281,11 +362,16 @@ class InteractionEngine:
                 self._primary_down = False
 
     def _handle_right_pinch(self, click_signal, t, commands):
+        if click_signal.gesture in (Gesture.PINCH_CANCEL, Gesture.RIGHT_PINCH_CANCEL):
+            return
+
         if self.pointing and click_signal.gesture == Gesture.RIGHT_PINCH_DOWN:
             if (
                 not self._right_pending
                 and not self._pinch_pending
                 and not self._primary_down
+                and not self._space_ready
+                and not self._space_dwelling
                 and self._press_allowed(t)
             ):
                 self._right_pending = True
@@ -322,13 +408,20 @@ class InteractionEngine:
         ) * blend
 
     def _handle_system_pose(self, pose, pointer_hand, filtered_hand, t, commands):
+        if pointer_hand is not None and is_three_finger_scroll_pose(pointer_hand):
+            self._system_hold_start = None
+            self._system_latched = False
+            return
+
         if pose != Pose.SYSTEM:
             self._system_hold_start = None
             self._system_latched = False
             return
 
-        # Ring lifting before latch means scroll intent, not peace toggle.
-        if pointer_hand is not None and finger_up(pointer_hand, 16, 14):
+        # Ring extended before latch means scroll intent, not peace toggle.
+        if pointer_hand is not None and finger_extended(
+            pointer_hand, 16, 14, 13
+        ):
             self._system_hold_start = None
             self._system_latched = False
             return
@@ -351,10 +444,7 @@ class InteractionEngine:
             self._pinch_start_t = None
             self._pinch_start_tip = None
             self._right_pending = False
-            self._space_origin = None
-            self._space_armed = False
-            self._space_ready = False
-            self._space_last_seen_t = None
+            self._clear_space_state()
             self._was_scroll_active = False
             self.pointing = False
             self._tracking_active = False

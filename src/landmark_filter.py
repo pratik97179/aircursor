@@ -21,7 +21,8 @@ def _smoothing_factor(cutoff, dt):
 
 
 class _OneEuroAxis:
-    def __init__(self):
+    def __init__(self, min_cutoff=None):
+        self._min_cutoff = min_cutoff
         self._x = None
         self._dx = 0.0
         self._t = None
@@ -47,7 +48,8 @@ class _OneEuroAxis:
             self._dx
             + _smoothing_factor(config.ONE_EURO_D_CUTOFF, dt) * (dx - self._dx)
         )
-        cutoff = config.ONE_EURO_MIN_CUTOFF + config.ONE_EURO_BETA * abs(edx)
+        base = self._min_cutoff if self._min_cutoff is not None else config.ONE_EURO_MIN_CUTOFF
+        cutoff = base + config.ONE_EURO_BETA * abs(edx)
         self._x = self._x + _smoothing_factor(cutoff, dt) * (value - self._x)
         self._dx = edx
         self._t = t

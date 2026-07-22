@@ -2,6 +2,150 @@
 
 All notable changes to AirCursor are documented in this file.
 
+## [0.16.1]
+
+### Changed
+
+- Removed the bottom-left current-gesture card; the right pointer card remains.
+- Gesture feed is now newest-at-top: entries slide/fade in at the top, older
+  entries move downward, and the oldest fades/slides out at the bottom.
+- MediaPipe `VIDEO` inference now runs on a background worker with a one-frame
+  latest-only queue; stale frames are dropped instead of blocking webcam/UI.
+
+### Performance
+
+- HUD-only rendering benchmarks around 9 ms/frame at 1280×720; the previous
+  dominant stall was synchronous 960×540 two-hand MediaPipe inference.
+
+## [0.16.0]
+
+### Added
+
+- Game-style gesture feed on the left, showing the latest 10 recognized
+  gestures/actions with newest at the bottom.
+- New entries slide/fade in; older rows shift upward and the oldest fades and
+  slides out when the feed exceeds 10 entries.
+
+### Changed
+
+- Replaced the temporary center action flash with the persistent gesture feed.
+- Feed events include Cursor On/Off, Click, Right Click, Drag, Scroll Armed,
+  Palm Armed, and directional Space switches.
+
+## [0.15.4]
+
+### Fixed
+
+- Right-click reliability: no longer cancel mid-gesture when the index finger
+  briefly reads extended. Target tip is chosen by distance margin
+  (`PINCH_TARGET_MARGIN`) — thumb nearer middle → right-click, nearer index →
+  left-click. Ring+pinky must still be curled; fists still never click.
+
+## [0.15.3]
+
+### Fixed
+
+- Closed left-hand fist no longer triggers click/drag/right-click when the
+  thumb rests on curled fingertips. Clicks require an explicit pinch pose:
+  index extended for left-click, middle extended for right-click; a fist
+  cancels an in-flight pinch instead of completing it.
+
+## [0.15.2]
+
+### Changed
+
+- Palm movement HUD now mirrors scroll feedback: dwell progress, an anchored
+  rubber-band, and a direction arrow based on actual left/right movement.
+- Pre-arm palm feedback uses a symmetric two-way arrow instead of implying
+  only one available direction.
+
+## [0.15.1]
+
+### Fixed
+
+- Spaces swipe now tracks **left** as well as right: re-arm after each switch
+  so the opposite direction can fire without closing the palm, and keep
+  tracking via `palm_candidate` mid-swipe when the thumb flickers.
+
+## [0.15.0]
+
+### Fixed
+
+- Open-palm Spaces no longer collides with click: palm and pinch are mutually
+  exclusive gesture families. Opening/closing the palm cancels pending pinches
+  instead of emitting a click; a short lockout blocks phantom tip contact.
+
+### Changed
+
+- Pinch starts only in the pinch family (ring + pinky curled).
+- Spaces requires a stable open-palm dwell (`SPACE_PALM_DWELL`) before arming,
+  then a horizontal-dominant swipe (`SPACE_SWIPE_AXIS_RATIO`).
+- HUD distinguishes palm hold vs palm armed; pinch connectors hidden during palm.
+
+### Added
+
+- `PINCH_CANCEL` / `RIGHT_PINCH_CANCEL` signals; `palm_candidate` on click signal.
+- Regression tests in `tests/test_gesture_arbitration.py`.
+
+## [0.14.0]
+
+### Changed
+
+- **HUD visual overhaul**: chrome is now composited with Pillow for real
+  anti-aliased **SF Pro** typography and true **frosted-glass** panels
+  (Gaussian blur-behind + soft drop shadows + hairline borders + accent rails).
+- Top bar redesigned into two floating glass islands (brand/tracking + mode).
+- Hand cards now show eyebrow, live status, and contextual guidance line.
+- Center action flash: frosted pill with expanding accent ring and pop-in.
+- Modern accent palette (tailwind-style greens/orange/cyan/violet).
+
+### Added
+
+- `pillow` dependency for HUD text and glass rendering.
+
+## [0.13.1]
+
+### Fixed
+
+- Removed full-frame black vignette that crushed camera brightness.
+
+### Changed
+
+- HUD polish: glass panels (local only), corner brackets, glow rings, pulse
+  accents, expanding action flash — no dark wash over the live feed.
+
+## [0.13.0]
+
+### Added
+
+- **Spatial Control HUD** (`hud_renderer.py`): translucent top bar, hand role
+  cards, gesture-specific overlays, and center action flashes.
+- Scroll HUD data: `ScrollIntentSignal.dwell_progress`, `anchor`, `centroid`.
+- Keys: `H` toggles HUD chrome; `D` toggles landmark/geometry debug.
+
+### Changed
+
+- Webcam preview no longer shows always-on geometry fingertip dots; debug
+  overlays are opt-in via `HUD_SHOW_DEBUG` / `D`.
+
+## [0.12.2]
+
+### Fixed
+
+- Finger extended/curled is now hand-relative (MCP→PIP→TIP), not screen-Y —
+  tilted hands no longer false-trigger peace / scroll / open palm.
+- MediaPipe confidence raised; inference bumped to 960×540; handedness score gate.
+- Debug overlay shows geometry-true extended fingertips; full skeleton via
+  `SHOW_LANDMARKS`.
+
+## [0.12.1]
+
+### Changed
+
+- Scroll feel polish: faster dwell (0.16s), dwell/armed grace frames, gentler
+  rubber curve, lower per-frame cap, smoother centroid filter.
+- Peace timer resets when three-finger scroll pose is detected.
+
 ## [0.12.0]
 
 ### Changed

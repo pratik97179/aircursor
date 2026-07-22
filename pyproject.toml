@@ -1,6 +1,6 @@
 [project]
 name = "aircursor"
-version = "0.12.0"
+version = "0.16.1"
 description = "Hands-free macOS cursor control via webcam hand tracking"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -8,6 +8,7 @@ dependencies = [
     "mediapipe>=0.10.35",
     "numpy>=2.5.1",
     "opencv-python>=5.0.0.93",
+    "pillow>=11.0.0",
     "pyobjc-framework-quartz>=12.2.1",
 ]
 
@@ -26,8 +27,11 @@ bypass-selection = true
 "src/config.py" = "config.py"
 "src/camera.py" = "camera.py"
 "src/hand_tracker.py" = "hand_tracker.py"
+"src/hand_landmarks.py" = "hand_landmarks.py"
 "src/landmark_filter.py" = "landmark_filter.py"
 "src/pose_classifier.py" = "pose_classifier.py"
 "src/gesture_engine.py" = "gesture_engine.py"
+"src/scroll_intent_engine.py" = "scroll_intent_engine.py"
 "src/interaction_engine.py" = "interaction_engine.py"
 "src/action_dispatcher.py" = "action_dispatcher.py"
+"src/hud_renderer.py" = "hud_renderer.py"
